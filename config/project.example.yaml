@@ -1,0 +1,32 @@
+# Copy to project.yaml and edit. Read by the pipeline (cli.py) from phase 2 onward.
+comfyui:
+  url: http://127.0.0.1:8188
+
+input:
+  video: samples/dance/dance.webm   # relative to the project root; CLI argument overrides it
+  start: 5             # seconds into the clip; --start overrides
+  seconds: 4           # length to process (omit or null = to the end); --seconds overrides
+
+models:
+  checkpoint: Counterfeit-V3.0_fix_fp16.safetensors
+  controlnet_lineart: control_v11p_sd15s2_lineart_anime_fp16.safetensors
+
+style:
+  positive: "masterpiece, best quality, anime style, cel shading, clean lineart, vibrant colors"
+  negative: "lowres, bad anatomy, bad hands, blurry, worst quality, jpeg artifacts, watermark, realistic, photo"
+  # style_lora: my_style.safetensors   # phase 4
+
+sampling:
+  seed: 12345          # fixed per shot; the same seed on every frame limits flicker
+  steps: 24
+  cfg: 7.0
+  sampler: euler_ancestral
+  scheduler: normal
+  denoise: 0.4         # 0.35-0.55 keeps the source structure; 0.4 tested on the dance clip (0.55 drifted)
+
+controlnet:
+  lineart_strength: 0.8
+
+video:
+  work_fps: 12         # stylize "on twos"; the output is encoded at this rate
+  target_megapixels: 0.4   # about 512x768; safe on a 6 GB GPU

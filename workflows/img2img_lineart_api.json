@@ -1,0 +1,15 @@
+{
+  "1": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": "Counterfeit-V3.0_fix_fp16.safetensors"}},
+  "2": {"class_type": "LoadImage", "inputs": {"image": "example.png"}},
+  "3": {"class_type": "ImageScaleToTotalPixels", "inputs": {"image": ["2", 0], "upscale_method": "lanczos", "megapixels": 0.4, "resolution_steps": 8}},
+  "4": {"class_type": "CLIPTextEncode", "inputs": {"text": "", "clip": ["1", 1]}},
+  "5": {"class_type": "CLIPTextEncode", "inputs": {"text": "", "clip": ["1", 1]}},
+  "6": {"class_type": "ControlNetLoader", "inputs": {"control_net_name": "control_v11p_sd15s2_lineart_anime_fp16.safetensors"}},
+  "7": {"class_type": "AnimeLineArtPreprocessor", "inputs": {"image": ["3", 0], "resolution": 512}},
+  "8": {"class_type": "ControlNetApplyAdvanced", "inputs": {"positive": ["4", 0], "negative": ["5", 0], "control_net": ["6", 0], "image": ["7", 0], "strength": 0.8, "start_percent": 0.0, "end_percent": 1.0, "vae": ["1", 2]}},
+  "9": {"class_type": "VAEEncode", "inputs": {"pixels": ["3", 0], "vae": ["1", 2]}},
+  "10": {"class_type": "KSampler", "inputs": {"model": ["1", 0], "positive": ["8", 0], "negative": ["8", 1], "latent_image": ["9", 0], "seed": 12345, "steps": 24, "cfg": 7.0, "sampler_name": "euler_ancestral", "scheduler": "normal", "denoise": 0.55}},
+  "11": {"class_type": "VAEDecode", "inputs": {"samples": ["10", 0], "vae": ["1", 2]}},
+  "12": {"class_type": "SaveImage", "inputs": {"images": ["11", 0], "filename_prefix": "anime"}},
+  "13": {"class_type": "SaveImage", "inputs": {"images": ["7", 0], "filename_prefix": "lineart"}}
+}

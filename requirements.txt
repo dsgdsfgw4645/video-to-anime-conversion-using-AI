@@ -1,0 +1,12 @@
+# Pipeline dependencies. torch/torchvision are installed separately with the CUDA index:
+#   .venv\Scripts\python.exe -m pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu126
+# ComfyUI's own requirements live in third_party/ComfyUI/requirements.txt
+requests
+pyyaml
+typer
+tqdm
+pillow
+opencv-python
+huggingface-hub
+pytest
+scikit-image
