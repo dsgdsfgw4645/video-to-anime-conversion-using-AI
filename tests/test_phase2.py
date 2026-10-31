@@ -7,6 +7,7 @@ import pytest
 from PIL import Image
 
 import pipeline.batch as batch
+import pipeline.server as server
 from pipeline.metrics import flicker_report
 from pipeline.shot_state import SettingsChanged
 from pipeline.video import extract_frames, encode, has_audio
@@ -192,6 +193,79 @@ def test_cli_with_no_command_runs_the_config(clip, tmp_path, monkeypatch):
     result = CliRunner().invoke(cli.app, [])                                # what `python cli.py` does
     assert result.exit_code == 0, result.output
     assert (tmp_path / "work" / "default" / "out" / "auto.mp4").exists()
+
+
+class _Proc:
+    pid = 1
+
+    def poll(self):
+        return None
+
+
+class _Client:
+    """is_up() is False for the first `down_polls` calls, then True."""
+    url = "http://127.0.0.1:8188"
+
+    def __init__(self, down_polls):
+        self.down = down_polls
+
+    def is_up(self):
+        self.down -= 1
+        return self.down < 0
+
+
+def _fake_server(monkeypatch):
+    calls = []
+    monkeypatch.setattr(server, "_start", lambda port: calls.append(("start", port)) or _Proc())
+    monkeypatch.setattr(server, "_stop", lambda proc: calls.append(("stop",)))
+    monkeypatch.setattr(server.time, "sleep", lambda s: None)
+    return calls
+
+
+def test_server_already_running_is_left_alone(monkeypatch):
+    calls = _fake_server(monkeypatch)
+    with server.comfy_server(_Client(0), {}):
+        pass
+    assert calls == []                                                     # not started, not stopped
+
+
+def test_server_is_started_and_stopped_when_down(monkeypatch):
+    calls = _fake_server(monkeypatch)
+    with server.comfy_server(_Client(3), {"comfyui": {}}):
+        assert calls == [("start", 8188)]
+    assert calls == [("start", 8188), ("stop",)]
+
+
+def test_server_is_stopped_even_if_the_work_fails(monkeypatch):
+    calls = _fake_server(monkeypatch)
+    with pytest.raises(ValueError):
+        with server.comfy_server(_Client(1), {"comfyui": {}}):
+            raise ValueError("boom")
+    assert calls[-1] == ("stop",)
+
+
+def test_autostop_false_leaves_it_running(monkeypatch):
+    calls = _fake_server(monkeypatch)
+    with server.comfy_server(_Client(1), {"comfyui": {"autostop": False}}):
+        pass
+    assert calls == [("start", 8188)]
+
+
+def test_autostart_false_raises_instead_of_starting(monkeypatch):
+    calls = _fake_server(monkeypatch)
+    with pytest.raises(RuntimeError, match="not reachable"):
+        with server.comfy_server(_Client(5), {"comfyui": {"autostart": False}}):
+            pass
+    assert calls == []
+
+
+def test_nothing_to_stylize_never_needs_the_server(clip, tmp_path, monkeypatch):
+    _fake_comfy(monkeypatch)
+    extract_frames(clip, tmp_path / "frames" / "s", fps=12, seconds=1)
+    batch.stylize_shot(CFG, tmp_path, "s")
+    monkeypatch.setattr(server, "_start", lambda port: pytest.fail("server must not start"))
+    monkeypatch.setattr(FakeClient, "is_up", lambda self: False)
+    assert batch.stylize_shot(CFG, tmp_path, "s") == 0                     # all done: no server needed
 
 
 def test_shot_name_priority():

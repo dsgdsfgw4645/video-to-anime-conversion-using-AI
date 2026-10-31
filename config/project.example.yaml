@@ -1,6 +1,8 @@
 # Copy to project.yaml and edit. Read by the pipeline (cli.py) from phase 2 onward.
 comfyui:
   url: http://127.0.0.1:8188
+  autostart: true      # start ComfyUI (scripts/start_comfyui.ps1) when it isn't running
+  autostop: true       # stop it again afterwards, but only if we started it; false = leave it running
 
 input:
   video: samples/dance/dance.webm   # relative to the project root; CLI argument overrides it

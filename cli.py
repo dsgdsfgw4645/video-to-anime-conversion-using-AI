@@ -4,6 +4,7 @@ r"""Video -> anime CLI (phase 2: ingest -> per-frame img2img -> encode).
   .venv\Scripts\python.exe cli.py preview other.mp4 --start 10 --seconds 3   # CLI overrides config
   .venv\Scripts\python.exe cli.py run                # config's slice; set seconds: null for the whole clip
   .venv\Scripts\python.exe cli.py                  # no command = run, so an IDE's run button works
+ComfyUI is started automatically if it isn't running (and stopped afterwards if cli.py started it).
 Re-running the same command resumes: finished frames are skipped.
 """
 from pathlib import Path
@@ -83,8 +84,15 @@ def run(
 
 
 @app.command()
-def flicker(shot: str, project: str = "default") -> None:
+def flicker(
+    shot: Optional[str] = typer.Argument(None, help="defaults to input.shot in the config"),
+    project: str = "default",
+) -> None:
     """Mean consecutive-frame SSIM of a stylized shot vs its source (the phase 2 baseline to beat)."""
+    inp = load_config().get("input", {})
+    shot = shot or inp.get("shot")
+    if not shot:
+        raise typer.BadParameter("pass a shot name or set input.shot in the config.")
     pdir = ROOT / "work" / project
     r = flicker_report(pdir / "frames" / shot, pdir / "anime" / shot)
     typer.echo(f"source {r['source_ssim']:.3f}  anime {r['anime_ssim']:.3f}  ratio {r['ratio']:.3f}")

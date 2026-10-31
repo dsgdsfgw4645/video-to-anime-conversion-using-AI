@@ -1,9 +1,68 @@
 {
-    // Use IntelliSense to learn about possible attributes.
-    // Hover to view descriptions of existing attributes.
-    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    // Pick one in the Run and Debug panel (Ctrl+Shift+D), then press F5 (debug) or Ctrl+F5 (run).
+    // Every Python entry point starts ComfyUI by itself if it isn't running, so no terminal is needed.
+    // Settings (video, start, seconds, shot, denoise ...) live in config/project.yaml, or project.example.yaml.
     "version": "0.2.0",
     "configurations": [
+        {
+            "name": "Phase 2: convert video (config input)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/cli.py",
+            "args": ["run"],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Phase 2: short preview (config input, 4 s default)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/cli.py",
+            "args": ["preview"],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Phase 2: flicker check (config shot)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/cli.py",
+            "args": ["flicker"],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Phase 1: single-frame smoke test",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/test_single_frame.py",
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Setup: download models",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/download_models.py",
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Tests: pytest",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "pytest",
+            "args": ["tests", "-q"],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "ComfyUI server only (stays running, for the ComfyUI web page)",
+            "type": "PowerShell",
+            "request": "launch",
+            "script": "${workspaceFolder}/scripts/start_comfyui.ps1",
+            "args": []
+        },
         {
             "name": "PowerShell: Launch Current File",
             "type": "PowerShell",

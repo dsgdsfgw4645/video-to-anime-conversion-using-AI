@@ -11,6 +11,7 @@ from PIL import Image
 from tqdm import tqdm
 
 from pipeline.comfy_client import ComfyClient
+from pipeline.server import comfy_server
 from pipeline.shot_state import SETTINGS, prepare
 from pipeline.stylize import ANIME_NODE, LINEART_NODE, build_workflow
 
@@ -37,21 +38,18 @@ def stylize_shot(cfg: dict, project_dir: Path, shot: str,
     """
     frames_dir = project_dir / "frames" / shot
     prepare(project_dir / "anime" / shot, stylize_settings(cfg, frames_dir, seed, denoise))  # before needing the server
+    todo = [f for f in sorted(frames_dir.glob("frame_*.png")) if not (project_dir / "anime" / shot / f.name).exists()]
+    if not todo:
+        return 0
     client = ComfyClient(cfg["comfyui"]["url"])
-    if not client.is_up():
-        raise RuntimeError("ComfyUI is not reachable. Start it with scripts\\start_comfyui.ps1")
-    frames = sorted(frames_dir.glob("frame_*.png"))
-    done = 0
-    for frame in tqdm(frames, desc="stylize", unit="frame"):
-        if (project_dir / "anime" / shot / frame.name).exists():
-            continue
-        with Image.open(frame) as im:
-            size = im.size
-        wf = build_workflow(cfg, client.upload_image(frame), size, seed=seed, denoise=denoise)
-        entry = client.wait(client.queue(wf))
-        client.download_outputs(
-            entry, project_dir,
-            names={ANIME_NODE: f"anime/{shot}/{frame.name}", LINEART_NODE: f"lineart/{shot}/{frame.name}"},
-        )
-        done += 1
-    return done
+    with comfy_server(client, cfg):  # starts ComfyUI if it isn't running; stops it again if it did
+        for frame in tqdm(todo, desc="stylize", unit="frame"):
+            with Image.open(frame) as im:
+                size = im.size
+            wf = build_workflow(cfg, client.upload_image(frame), size, seed=seed, denoise=denoise)
+            entry = client.wait(client.queue(wf))
+            client.download_outputs(
+                entry, project_dir,
+                names={ANIME_NODE: f"anime/{shot}/{frame.name}", LINEART_NODE: f"lineart/{shot}/{frame.name}"},
+            )
+    return len(todo)

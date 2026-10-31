@@ -1,6 +1,6 @@
 """Phase-1 smoke test: restyle one image into anime via ComfyUI (img2img + anime-lineart ControlNet).
 
-ComfyUI must be running (scripts\\start_comfyui.ps1).
+ComfyUI is started automatically if it isn't running (scripts\\start_comfyui.ps1).
 Usage:  .venv\\Scripts\\python.exe scripts\\test_single_frame.py [image] [--denoise 0.55] [--seed 12345]
 """
 import argparse
@@ -14,6 +14,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from pipeline.comfy_client import ComfyClient  # noqa: E402
+from pipeline.server import comfy_server  # noqa: E402
 from pipeline.stylize import build_workflow, load_config  # noqa: E402
 
 
@@ -27,21 +28,19 @@ def main() -> None:
 
     cfg = load_config()
     client = ComfyClient(cfg["comfyui"]["url"])
-    if not client.is_up():
-        sys.exit("ComfyUI is not reachable. Start it with scripts\\start_comfyui.ps1")
 
     with Image.open(args.image) as im:
         size = im.size
-    wf = build_workflow(
-        cfg,
-        client.upload_image(Path(args.image)),
-        size,
-        seed=args.seed,
-        denoise=args.denoise,
-    )
-
-    t0 = time.time()
-    saved = client.run(wf, Path(args.out))
+    with comfy_server(client, cfg):  # starts ComfyUI if it isn't running; stops it again if it did
+        wf = build_workflow(
+            cfg,
+            client.upload_image(Path(args.image)),
+            size,
+            seed=args.seed,
+            denoise=args.denoise,
+        )
+        t0 = time.time()
+        saved = client.run(wf, Path(args.out))
     print(f"done in {time.time() - t0:.1f}s")
     for paths in saved.values():
         for p in paths:

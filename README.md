@@ -20,10 +20,12 @@ git clone --depth 1 https://github.com/Fannovel16/comfyui_controlnet_aux.git thi
 .venv\Scripts\python.exe scripts\download_models.py
 ```
 
+The full run reference, for the IDE and the command prompt, is in [docs/how-to-run.md](docs/how-to-run.md). In VS Code, pick a run configuration in Run and Debug (Ctrl+Shift+D); ComfyUI starts by itself when needed.
+
 ## Run the smoke test
 
 ```powershell
-scripts\start_comfyui.ps1                                   # terminal 1: server on :8188
+scripts\start_comfyui.ps1                                   # optional: the scripts below start the server themselves if it is not running
 .venv\Scripts\python.exe scripts\test_single_frame.py       # terminal 2: restyles ComfyUI's example.png
 .venv\Scripts\python.exe scripts\test_single_frame.py my_frame.png --denoise 0.45
 ```
@@ -33,11 +35,11 @@ Settings come from `config/project.yaml`, falling back to `config/project.exampl
 
 ## Convert a video (phase 2)
 
-ComfyUI must be running. The input clip, start time, length and shot name come from the `input:` section of the config;
+ComfyUI starts by itself if it isn't running (set `comfyui.autostart: false` to disable). The input clip, start time, length and shot name come from the `input:` section of the config;
 command-line options override them.
 
 ```powershell
-scripts\start_comfyui.ps1                                   # terminal 1
+scripts\start_comfyui.ps1                                   # optional: cli.py starts the server itself if it is not running
 .venv\Scripts\python.exe cli.py preview                     # terminal 2: config's slice (4 s if seconds is unset)
 .venv\Scripts\python.exe cli.py preview other.mp4 --start 10 --seconds 3 --denoise 0.4
 .venv\Scripts\python.exe cli.py                             # no command = run (works from an IDE's run button)

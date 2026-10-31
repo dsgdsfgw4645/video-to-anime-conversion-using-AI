@@ -18,7 +18,8 @@ The shot name comes from `--shot`, else `input.shot` in the config, else the vid
 
 | File | Purpose |
 |---|---|
-| `cli.py` | Typer commands `preview`, `run`, `flicker` |
+| `cli.py` | Typer commands `preview`, `run`, `flicker`; no command means `run` |
+| `pipeline/server.py` | `comfy_server`: starts ComfyUI if it isn't running and stops it afterwards |
 | `pipeline/video.py` | `extract_frames`, `encode`, `has_audio` (ffmpeg/ffprobe wrappers) |
 | `pipeline/batch.py` | `stylize_shot`: the resumable loop over `ComfyClient` |
 | `pipeline/shot_state.py` | `prepare`, `SettingsChanged`: records each shot's settings and refuses to reuse a shot made with different ones |
