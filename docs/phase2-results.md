@@ -8,8 +8,8 @@ This is the baseline that phase 3 (consistency) has to beat. It reuses the phase
 `cli.py preview|run` calls `_process()`:
 
 1. **Resolve inputs.** Video, start, seconds and shot come from the CLI, else from `input:` in the config (shot: else the video's file name, plus `_preview` for `preview`). `preview` uses 4 s if no length is given anywhere. A missing file is a clear error.
-2. **Ingest** (`pipeline.video.extract_frames`): ffmpeg writes `work/<project>/frames/<shot>/frame_%05d.png` at `video.work_fps` (12). If frames already exist, it does nothing.
-3. **Stylize** (`pipeline.batch.stylize_shot`): for each source frame whose `anime/<shot>/frame_*.png` is missing, upload it, build the graph with `build_workflow()` (the lineart size is derived from the frame), queue, wait, and save the anime frame and the lineart debug map under `anime/` and `lineart/`. The seed is the same on every frame.
+2. **Ingest** (`pipeline.video.extract_frames`): ffmpeg writes `work/<project>/frames/<shot>/frame_%05d.png` at `video.work_fps` (12). If frames already exist and were made with the same settings, it reuses them; with different settings the run stops (section 3).
+3. **Stylize** (`pipeline.batch.stylize_shot`): for each source frame whose `anime/<shot>/frame_*.png` is missing, upload it, build the graph with `build_workflow()` (the lineart size is derived from the frame), queue, wait, and save the anime frame and the lineart debug map under `anime/` and `lineart/`. The settings check runs first. ComfyUI is started on demand (`pipeline/server.py`) only if at least one frame is left to do, and stopped again if the run started it. The seed is the same on every frame.
 4. **Encode** (`pipeline.video.encode`): H.264, CRF 18, yuv420p (sizes rounded down to even), with the matching slice of the source audio as AAC. Output: `work/<project>/out/<shot>.mp4`.
 
 The shot name comes from `--shot`, else `input.shot` in the config, else the video's file name (`<name>_preview` for `preview`). Use a new name to keep several variants side by side.
@@ -24,7 +24,7 @@ The shot name comes from `--shot`, else `input.shot` in the config, else the vid
 | `pipeline/batch.py` | `stylize_shot`: the resumable loop over `ComfyClient` |
 | `pipeline/shot_state.py` | `prepare`, `SettingsChanged`: records each shot's settings and refuses to reuse a shot made with different ones |
 | `pipeline/metrics.py` | `mean_consecutive_ssim`, `flicker_report` |
-| `tests/test_phase2.py` | 11 tests; ComfyUI is faked, ffmpeg is real |
+| `tests/test_phase2.py` | 19 tests; ComfyUI is faked, ffmpeg is real |
 | `config/project.example.yaml` | new `input:` section; `denoise` now 0.4 |
 | `samples/dance/dance.webm` | test clip, 51 s, 1080p. CC BY 3.0, ThierryTuyishimeTV, Wikimedia Commons |
 
@@ -38,7 +38,7 @@ The shot name comes from `--shot`, else `input.shot` in the config, else the vid
 
 ## 4. Verified
 
-- `pytest tests -q`: 11 pass (extraction count and resume, slicing, audio and duration, odd frame sizes, resume after a mid-shot crash, flicker metric, and settings tracking: stop on changed start, denoise or seed leaving every file untouched, different source frames, shots with no record, and the CLI exiting with a message and keeping the old video).
+- `pytest tests -q`: 19 pass (extraction count and resume, slicing, audio and duration, odd frame sizes, resume after a mid-shot crash, flicker metric, and settings tracking: stop on changed start, denoise or seed leaving every file untouched, different source frames, shots with no record, the CLI exiting with a message and keeping the old video, running with no command, the server start and stop logic, and skipping the server when nothing is left to do).
 - Real run on the dance clip (5 s start, 4 s long, denoise 0.4): 48 frames, about 15 s per frame (about 12 min) on the RTX 2060, output has 48 video frames plus audio.
 - A 1 s slice at denoise 0.55 also ran, and drifted much more in colors and outfits than 0.4.
 

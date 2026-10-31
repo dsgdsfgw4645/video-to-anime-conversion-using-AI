@@ -80,7 +80,7 @@ That is why `models\clip`, `models\vae`, `models\text_encoders` and `models\unet
 ### 3.1 The Python side (`scripts/test_single_frame.py`)
 
 1. `load_config()` (in `pipeline/stylize.py`) reads `config\project.yaml` if it exists, otherwise `config\project.example.yaml`. **`project.yaml` does not exist yet**, so the example file is what's actually being used.
-2. It makes a `ComfyClient(cfg["comfyui"]["url"])` and checks `client.is_up()`, which calls `GET /system_stats`.
+2. It makes a `ComfyClient(cfg["comfyui"]["url"])` and wraps the rest in `comfy_server()` (`pipeline/server.py`, added in phase 2). That calls `client.is_up()` (`GET /system_stats`); if nothing answers, it starts `scripts\start_comfyui.ps1` in the background, waits, and stops the server again afterwards. A server you started yourself is used and left alone.
 3. `build_workflow()` (in `pipeline/stylize.py`) loads `workflows\img2img_lineart_api.json` and **overwrites specific fields by node id** (table in section 4).
 4. `client.upload_image()` sends your image to ComfyUI's `input\` folder (`POST /upload/image`) and gets back the file name to put in node `"2"`.
 5. `client.run()` does three things in order:
@@ -124,7 +124,7 @@ Execution follows the data dependencies, not the numeric order.
 | `--denoise`, `--seed` on the command line (`test_single_frame.py` or `cli.py`) | `"10"` | override the two above |
 | the image argument | `"2"` | `image` (via `upload_image`) |
 
-Not graph nodes: `comfyui.url` is used by the client, and `video.work_fps` and `input.*` are used by `cli.py` (phase 2). `style.style_lora` is still a placeholder for phase 4.
+Not graph nodes: `comfyui.url` is used by the client (its port is used when the server is auto-started), `comfyui.autostart` and `comfyui.autostop` are used by `pipeline/server.py`, and `video.work_fps` and `input.*` are used by `cli.py` (phase 2). `style.style_lora` is still a placeholder for phase 4.
 
 ---
 

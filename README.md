@@ -59,13 +59,17 @@ Results and the flicker baseline are in [docs/phase2-results.md](docs/phase2-res
 
 | Path | Purpose |
 |---|---|
-| `cli.py` | `preview`, `run`, `flicker` commands |
+| `cli.py` | `preview`, `run`, `flicker` commands; no command means `run` |
 | `pipeline/comfy_client.py` | ComfyUI HTTP API client (upload, queue, wait, download) |
 | `pipeline/stylize.py` | config loading and `build_workflow()` (patches the graph by node id) |
 | `pipeline/video.py` | ffmpeg frame extraction and encoding |
 | `pipeline/batch.py` | resumable per-frame stylize loop |
+| `pipeline/shot_state.py` | records each shot's settings; stops a run that would overwrite a shot |
+| `pipeline/server.py` | starts ComfyUI when it isn't running, stops it afterwards |
 | `pipeline/metrics.py` | flicker metric |
-| `tests/` | phase 2 tests |
+| `tests/` | automated tests (no GPU needed) |
+| `docs/` | `how-to-run.md` (run reference), phase guides |
+| `.vscode/` | interpreter setting and run configurations |
 | `samples/` | test clips |
 | `workflows/` | ComfyUI API-format workflow graphs |
 | `scripts/` | model download, server launcher, phase 1 smoke test |
