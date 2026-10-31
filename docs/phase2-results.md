@@ -136,3 +136,22 @@ What the numbers say:
 - **Static flicker (grayscale):** the per-frame route plus deflicker already equals the full cloud route (3.88 both). The cloud route earns its cost in color steadiness, not in grayscale flicker.
 - **Best result:** AnimateDiff + IP-Adapter + deflicker is the steadiest on all three measures. Frame by frame it keeps skin tones and outfits steady across the shot; its limbs and crowd are blockier and slightly distorted.
 - **Not yet separated:** how much of the color steadiness is AnimateDiff and how much is IP-Adapter (needs an AnimateDiff-only run under a new shot name).
+
+### 9b. Does IP-Adapter help? AnimateDiff alone vs with IP-Adapter (same frames, seed, denoise)
+
+Shot `dance_run1_noip` is `dance_run1` with `animatediff.ip_adapter.enabled: false` (frames byte-identical).
+
+| stage | static change | color flicker | color drift |
+|---|---|---|---|
+| AnimateDiff alone | 4.34 | **0.69** | **1.47** |
+| AnimateDiff + IP-Adapter 0.5 | **4.30** | 0.76 | 1.63 |
+| AnimateDiff alone + deflicker | 3.97 | **0.53** | **1.40** |
+| AnimateDiff + IP-Adapter 0.5 + deflicker | **3.88** | 0.57 | 1.55 |
+| AnimateDiff + IP-Adapter 0.5, reference = frame 20 of the AnimateDiff-only output (`dance_run1_refad`) | 4.61 | 0.73 | 1.53 |
+| the same + deflicker | 4.24 | 0.54 | 1.45 |
+
+- **AnimateDiff is what steadies the shot.** IP-Adapter at weight 0.5 with the frame-28 reference gives no measurable gain in steadiness: static change is the same, and the color numbers are about 10% worse with it (single clip and seed, so treat small differences with care).
+- **What it does change:** the look. With IP-Adapter the palette is more saturated and takes on the reference's colors (red hair and red socks appear that are not in the source). AnimateDiff alone stays closer to the source's colors (skin tones, a blue skirt).
+- **Likely cause:** the reference (frame 28 of the per-frame output) itself contains the recolored outfits (reds and oranges) that the per-frame stylizer invented, so IP-Adapter pushes those colors onto every frame. A reference whose colors match the source, or a lower weight, is untested.
+- **Better reference tried (`dance_run1_refad`):** with a reference taken from the AnimateDiff-only output, the stray red accents are gone and the color numbers fall between the other two runs, but static flicker is worse (4.61 against 4.34) and nothing beats AnimateDiff alone.
+- **Decision:** IP-Adapter is off by default (`animatediff.ip_adapter.enabled: false`). Untested: weights below 0.5, and footage where the checkpoint recolors more strongly; turn it on with `--set animatediff.ip_adapter.enabled=true` when packing.

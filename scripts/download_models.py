@@ -32,8 +32,9 @@ FILES = [
 
 # Extra models for the cloud stage (cli.py animatediff), fetched with --cloud:
 # (repo, file in the repo, folder under third_party/ComfyUI, name to save it as)
-CLOUD_FILES = [
-    ("guoyww/animatediff", "v3_sd15_mm.ckpt", "models/animatediff_models", "v3_sd15_mm.ckpt"),
+MOTION_FILES = [("guoyww/animatediff", "v3_sd15_mm.ckpt", "models/animatediff_models", "v3_sd15_mm.ckpt")]
+# only needed when animatediff.ip_adapter.enabled is true (about 2.6 GB)
+IP_ADAPTER_FILES = [
     ("h94/IP-Adapter", "models/ip-adapter_sd15.safetensors", "models/ipadapter", "ip-adapter_sd15.safetensors"),
     # the unified IP-Adapter loader looks for the ViT-H image encoder under this exact name
     ("h94/IP-Adapter", "models/image_encoder/model.safetensors", "models/clip_vision",
@@ -41,8 +42,16 @@ CLOUD_FILES = [
 ]
 
 
+def cloud_files(ip_adapter_enabled: bool) -> list:
+    return MOTION_FILES + (IP_ADAPTER_FILES if ip_adapter_enabled else [])
+
+
 def fetch_cloud() -> None:
-    for repo, filename, subdir, name in CLOUD_FILES:
+    sys.path.insert(0, str(ROOT))
+    from pipeline.stylize import load_config
+    enabled = load_config()["animatediff"]["ip_adapter"]["enabled"]
+    print(f"IP-Adapter {'on' if enabled else 'off'} in the config: {'fetching' if enabled else 'skipping'} its models")
+    for repo, filename, subdir, name in cloud_files(enabled):
         dest = COMFY / subdir
         dest.mkdir(parents=True, exist_ok=True)
         if (dest / name).exists():

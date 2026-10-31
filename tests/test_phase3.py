@@ -78,6 +78,7 @@ def test_lowpass_blend_keeps_the_fresh_frames_fine_detail():
 import copy
 
 import pipeline.animatediff as ad
+R_SCRIPTS = Path(__file__).resolve().parent.parent / "scripts"
 from pipeline.stylize import load_config
 from pipeline.temporal import output_stage
 
@@ -88,7 +89,8 @@ def _refs_resolve(wf: dict) -> bool:
 
 
 def test_animatediff_graph_with_ip_adapter(tmp_path):
-    cfg = load_config()
+    cfg = copy.deepcopy(load_config())
+    cfg["animatediff"]["ip_adapter"]["enabled"] = True
     wf = ad.build_workflow(cfg, tmp_path, "ref.png", (1080, 1920))
     assert _refs_resolve(wf)
     assert wf["2"]["inputs"]["directory"] == str(tmp_path)
@@ -214,3 +216,38 @@ def test_random_recoloring_is_flagged_as_flicker_and_drift(tmp_path):
 def test_slow_color_drift_shows_in_drift_more_than_in_flicker(tmp_path):
     r = _color_shot(tmp_path, [(i * 8, 0, -i * 8) for i in range(8)])
     assert r["color_drift"] > 2 * r["color_flicker"] > 0
+
+
+# ---- cloud bundle overrides ----
+import importlib.util
+
+
+def _bundle_module():
+    spec = importlib.util.spec_from_file_location("make_cloud_bundle", Path(__file__).resolve().parent.parent / "scripts" / "make_cloud_bundle.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def test_bundle_overrides_change_only_the_named_settings():
+    m = _bundle_module()
+    cfg = copy.deepcopy(load_config())
+    out = m.apply_overrides(cfg, ["animatediff.ip_adapter.enabled=false", "animatediff.ip_adapter.weight=0.7"])
+    assert out["animatediff"]["ip_adapter"]["enabled"] is False and out["animatediff"]["ip_adapter"]["weight"] == 0.7
+    assert out["sampling"] == load_config()["sampling"]
+
+
+@pytest.mark.parametrize("bad", ["animatediff.nope=1", "nosuchsection.x=1", "animatediff.ip_adapter.enabled", "sampling.seed.x=1"])
+def test_bundle_rejects_unknown_or_malformed_overrides(bad):
+    with pytest.raises(SystemExit):
+        _bundle_module().apply_overrides(copy.deepcopy(load_config()), [bad])
+
+
+def test_ip_adapter_is_off_by_default_and_its_models_are_only_fetched_when_on():
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("dm", R_SCRIPTS / "download_models.py")
+    dm = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(dm)
+    assert load_config()["animatediff"]["ip_adapter"]["enabled"] is False
+    assert [f[3] for f in dm.cloud_files(False)] == ["v3_sd15_mm.ckpt"]
+    assert "ip-adapter_sd15.safetensors" in [f[3] for f in dm.cloud_files(True)]

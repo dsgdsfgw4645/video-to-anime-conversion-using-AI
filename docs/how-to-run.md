@@ -140,7 +140,7 @@ All in `config/project.example.yaml`. If you create `config/project.yaml` (copy 
 | `input.shot` | Name of this run. It names the folders and the output video. | `dance_run1` |
 | `models.checkpoint`, `models.controlnet_lineart` | Which model files to use. | Counterfeit-V3.0, lineart anime |
 | `style.positive`, `style.negative` | The prompts. | anime, cel shading, clean lineart ... |
-| `animatediff.*` | The cloud stage: motion module, window size, and `ip_adapter.enabled` / `weight` / `reference`. Used by `cli.py animatediff` (cloud GPU only; see `docs/cloud-kaggle.md`). | `v3_sd15_mm.ckpt`, 16, 4, on, 0.5 |
+| `animatediff.*` | The cloud stage: motion module, window size, and `ip_adapter.enabled` (off by default) / `weight` / `reference`. Used by `cli.py animatediff` (cloud GPU only; see `docs/cloud-kaggle.md`). | `v3_sd15_mm.ckpt`, 16, 4, on, 0.5 |
 | `temporal.strength`, `temporal.lowpass_sigma`, `temporal.error_threshold` | Phase 3 deflicker: weight of the warped previous frame (0.9), the blur radius in pixels below which colors are blended so edges stay crisp (2; 0 blends everything and softens), and the source color error above which the warp is ignored (25). Changing them under an existing shot stops the run; use a new shot name. | `0.9`, `2`, `25` |
 | `sampling.seed` | Same seed on every frame of a shot, to limit flicker. | `12345` |
 | `sampling.denoise` | How far the result moves from the source: lower stays closer. | `0.4` |
@@ -227,3 +227,5 @@ Add a line here whenever something is added or changed that affects how the proj
 | 2026-10-31 | Cloud stage added: `cli.py animatediff` (one AnimateDiff + lineart ControlNet + IP-Adapter pass, ~16 GB GPU), `scripts/make_cloud_bundle.py`, `notebooks/kaggle_animatediff.ipynb`, `download_models.py --cloud`, `animatediff:` config section, `deflicker --source`, `encode --stage`. Guide: `docs/cloud-kaggle.md`. Ran end to end locally on a small test, then confirmed working on Kaggle. |
 | 2026-10-31 | Cloud stage fixes found by running it: ComfyUI-Advanced-ControlNet nodes (stock ControlNet fails with sliding windows); `vram.py` no longer uses a Windows-only flag; `server.py` starts ComfyUI itself on Linux. |
 | 2026-10-31 | `cli.py flicker` also prints a color-steadiness line (frame-to-frame change and drift over the shot, Lab chroma units, lower = steadier). |
+| 2026-10-31 | `make_cloud_bundle.py` takes `--set KEY=VALUE` overrides and a shot name for variants (e.g. `dance_run1_noip --set animatediff.ip_adapter.enabled=false`), and always stores the effective config in the zip. |
+| 2026-10-31 | IP-Adapter is now off by default in the cloud stage (`animatediff.ip_adapter.enabled: false`): AnimateDiff alone was as steady and kept the source's colors better. `download_models.py --cloud` skips its 2.6 GB of models when it is off. |
