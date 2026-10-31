@@ -284,7 +284,7 @@ They do not test the ComfyUI graphs themselves. Phase 1, a real preview and a Ka
 
 ## 15. Not built yet
 
-From `plan.md`: phase 3 is done (local deflicker, and the AnimateDiff cloud stage on Kaggle). Optional phase 3 work still open: IP-Adapter at weights below 0.5, RAFT optical flow in the deflicker, and trying more clips (everything was tuned on one). Then phase 4 (LoRA training), phase 5 (matting, compositing, face pass) and phase 6 (per-shot config list, web UI, cloud worker). The numbers to compare against, on `dance_run1`, are in section 7 and `docs/phase3-guide.md`.
+From `plan.md`: phase 3 is done (local deflicker, and the AnimateDiff cloud stage on Kaggle). Optional phase 3 work still open: IP-Adapter at weights below 0.5, and trying more clips (everything was tuned on one). RAFT optical flow was tried in the deflicker and not kept: no gain on either test clip, even in fast camera pans (`phase3-guide.md` section 5.5). Then phase 4 (LoRA training), phase 5 (matting, compositing, face pass) and phase 6 (per-shot config list, web UI, cloud worker). The numbers to compare against, on `dance_run1`, are in section 7 and `docs/phase3-guide.md`.
 
 ## 16. Change log
 

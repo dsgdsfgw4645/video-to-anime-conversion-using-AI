@@ -1,0 +1,9 @@
+capetown_dance.webm
+
+Title:   Cape Town Palestine Soccer Match Dance
+Author:  23Faerie
+Source:  https://commons.wikimedia.org/wiki/File:Cape_Town_Palestine_Soccer_Match_Dance.webm
+License: Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0)
+         https://creativecommons.org/licenses/by-sa/4.0/
+Changes: none (an unmodified copy of the file from Wikimedia Commons).
+         The test uses 4 s starting at 8 s (shot capetown_run1) and at 13 s (shot capetown_pan1).

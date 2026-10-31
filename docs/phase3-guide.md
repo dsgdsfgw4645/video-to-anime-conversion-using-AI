@@ -124,6 +124,42 @@ Tuned on the per-frame output of this clip. Sharpness is the Laplacian variance 
 
 Chosen: strength 0.9, sigma 2, threshold 25. The full blend (sigma 0) is as steady but loses 42% of the sharpness and smears moving limbs. A lower threshold (15) was slightly worse everywhere. Checked by eye on the highest-motion frame (frame 10); one faint tint of the previous frame remains on one dancer's trousers.
 
+### 5.5 Tried and not kept: RAFT flow instead of Farneback
+
+The deflicker measures motion with OpenCV's Farneback method. A learned flow model, torchvision's RAFT, was tried in its place (temporarily, on the same 48 frames and settings; the code was removed again because it gave no gain). Farneback is the first row of each pair:
+
+| Input | Flow model | Static change | Color flicker | Color drift | Time |
+|---|---|---|---|---|---|
+| per-frame | **Farneback** | **3.88** | **0.82** | **1.95** | 11 s |
+| per-frame | RAFT-small | 3.97 | 0.88 | 2.01 | 12 s |
+| per-frame | RAFT-large | 3.94 | 0.84 | 1.99 | 21 s |
+| AnimateDiff alone | **Farneback** | **3.97** | 0.54 | 1.40 | 12 s |
+| AnimateDiff alone | RAFT-small | 4.00 | 0.54 | 1.40 | 12 s |
+| AnimateDiff alone | RAFT-large | 4.00 | 0.54 | 1.40 | 19 s |
+
+RAFT was equal or slightly worse, up to twice as slow, and needed `torchvision`, a weights download and the GPU. On the highest-motion frame (10), Farneback and RAFT-large differ by 1.1 grey levels on average, against 5.2 for what the deflicker changes at all; the pictures look the same.
+
+That clip has a locked-off camera and 87% still pixels, the easy case for Farneback, so it was tested again on the second clip (`capetown`, handheld camera), in two windows of 4 s. First, how accurately each method's warp reproduces the next *source* frame (warp error: mean color error after warping the previous source frame, lower is better; "trusted" is the share of pixels the deflicker would blend), measured on the source frames only:
+
+| Window of clip 2 | Farneback warp error | RAFT-large warp error | Trusted: Farneback / RAFT-large |
+|---|---|---|---|
+| 8 to 12 s (moderate camera move; `capetown_run1`) | 2.85 | 2.89 | 89.1% / 89.3% |
+| 2 to 6 s (a whip-pan) | 4.12 | 3.56 | 84.2% / 86.7% |
+| 13 to 17 s (fast pans; `capetown_pan1`) | 4.55 | 3.31 | 83.3% / 88.0% |
+
+RAFT's flow is clearly more accurate during fast camera moves (up to 27% lower error), and equal on the moderate one. But a better flow did not give a steadier result. The deflicker applied to the per-frame output of the two stylized windows (strength 0.9, sigma 2, threshold 25):
+
+| Window | Flow | Static change | Color flicker | Color drift |
+|---|---|---|---|---|
+| 8 to 12 s | no deflicker | 5.67 | 2.47 | 3.18 |
+| 8 to 12 s | **Farneback** | **3.77** | **1.18** | **2.44** |
+| 8 to 12 s | RAFT-small / RAFT-large | 3.81 / 3.81 | 1.22 / 1.20 | 2.48 / 2.46 |
+| 13 to 17 s | no deflicker | 6.40 | 3.01 | 4.22 |
+| 13 to 17 s | **Farneback** | **4.20** | **1.88** | **3.59** |
+| 13 to 17 s | RAFT-small / RAFT-large | 4.49 / 4.48 | 1.94 / 1.92 | 3.69 / 3.68 |
+
+On both windows RAFT was 1 to 7% worse than Farneback, never better, so it was not kept. (The bar was: at least 10% better on two of the three measures, with no loss of sharpness and a visible difference; RAFT never came close.) A likely reason is that the deflicker's trust map already rejects the pixels where Farneback is wrong, so a more accurate flow trusts more pixels but not better ones. The code was removed again; nothing about RAFT remains in the repository.
+
 ## 6. Verified
 
 - `pytest tests -q`: 47 pass (22 in `tests/test_phase3.py`: deflicker effect, resume, settings protection, trust map, low-pass edge test, the AnimateDiff graph with and without IP-Adapter and with the sliding-window-safe ControlNet nodes, the shot runner with a fake ComfyUI, missing-node message, color metric on synthetic shots, bundle overrides, IP-Adapter off by default).
@@ -135,7 +171,7 @@ Chosen: strength 0.9, sigma 2, threshold 25. The full blend (sigma 0) is as stea
 - **One clip.** Everything was tuned and measured on `dance_run1` (a mostly locked-off camera). Other footage may need other settings.
 - **AnimateDiff output has blockier limbs and a distorted crowd** that the metrics do not capture. The model is SD1.5 at 0.4 MP.
 - **IP-Adapter** was only tried at weight 0.5 with two references. Lower weights, and footage where the checkpoint recolors more strongly, are untested.
-- **The deflicker uses Farneback flow.** A learned flow model such as RAFT might follow fast limbs better; untried.
+- **RAFT flow was tried and not kept** (section 5.5): no gain on either clip, including fast camera pans.
 - **The deflicker cannot fix a color that is already wrong,** only smooth changes between frames.
 - **The cloud stage needs about 16 GB of GPU memory** and a Kaggle account (internet access in notebooks needs phone verification); free-tier limits change.
 - **The static metric** depends on how much of the shot is still (87% here) and says nothing about quality; the color metric averages over the whole frame.
