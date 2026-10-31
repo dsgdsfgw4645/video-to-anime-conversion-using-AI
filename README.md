@@ -44,7 +44,7 @@ scripts\start_comfyui.ps1                                   # optional: cli.py s
 .venv\Scripts\python.exe cli.py preview other.mp4 --start 10 --seconds 3 --denoise 0.4
 .venv\Scripts\python.exe cli.py                             # no command = run (works from an IDE's run button)
 .venv\Scripts\python.exe cli.py run                         # config's slice; seconds: null = whole clip
-.venv\Scripts\python.exe cli.py flicker <shot>              # frame-to-frame SSIM, stylized vs source
+.venv\Scripts\python.exe cli.py flicker <shot>              # flicker: whole-frame SSIM and change in static regions (lower = steadier); --frames N
 .venv\Scripts\python.exe -m pytest tests -q                 # no GPU or ComfyUI needed
 ```
 
@@ -66,7 +66,8 @@ Results and the flicker baseline are in [docs/phase2-results.md](docs/phase2-res
 | `pipeline/batch.py` | resumable per-frame stylize loop |
 | `pipeline/shot_state.py` | records each shot's settings; stops a run that would overwrite a shot |
 | `pipeline/server.py` | starts ComfyUI when it isn't running, stops it afterwards |
-| `pipeline/metrics.py` | flicker metric |
+| `pipeline/metrics.py` | flicker metrics (whole frame and static regions) |
+| `pipeline/vram.py` | peak GPU memory of a run |
 | `tests/` | automated tests (no GPU needed) |
 | `docs/` | `how-to-run.md` (run reference), phase guides |
 | `.vscode/` | interpreter setting and run configurations |

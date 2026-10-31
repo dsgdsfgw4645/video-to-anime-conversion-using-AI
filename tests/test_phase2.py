@@ -8,7 +8,8 @@ from PIL import Image
 
 import pipeline.batch as batch
 import pipeline.server as server
-from pipeline.metrics import flicker_report
+import pipeline.vram as vram
+from pipeline.metrics import flicker_report, static_region_flicker
 from pipeline.shot_state import SettingsChanged
 from pipeline.video import extract_frames, encode, has_audio
 
@@ -266,6 +267,64 @@ def test_nothing_to_stylize_never_needs_the_server(clip, tmp_path, monkeypatch):
     monkeypatch.setattr(server, "_start", lambda port: pytest.fail("server must not start"))
     monkeypatch.setattr(FakeClient, "is_up", lambda self: False)
     assert batch.stylize_shot(CFG, tmp_path, "s") == 0                     # all done: no server needed
+
+
+def _write_frames(folder: Path, frames: list[np.ndarray]) -> Path:
+    folder.mkdir(parents=True)
+    for i, f in enumerate(frames, 1):
+        Image.fromarray(np.clip(f, 0, 255).astype(np.uint8)).save(folder / f"frame_{i:05d}.png")
+    return folder
+
+
+def test_static_flicker_sees_noise_in_still_areas_but_not_real_motion(tmp_path):
+    rng = np.random.default_rng(1)
+    texture = rng.integers(60, 200, (64, 64)).astype(np.float32)
+    source, steady, flickery = [], [], []
+    for t in range(6):
+        frame = texture.copy()
+        frame[:, 32:48] = 255 if t % 2 else 0                  # a strip that really changes every frame
+        source.append(frame)
+        steady.append(frame)                                    # stylized frames follow the source exactly
+        noisy = frame.copy()
+        noisy[:, :32] += rng.integers(-40, 41, (64, 32))        # added flicker, on the still half only
+        flickery.append(noisy)
+    src = _write_frames(tmp_path / "src", source)
+    good = static_region_flicker(src, _write_frames(tmp_path / "steady", steady))
+    bad = static_region_flicker(src, _write_frames(tmp_path / "flickery", flickery))
+    assert good["static_diff"] < 1.0                            # the strip's real change isn't counted
+    assert bad["static_diff"] > 10 * good["static_diff"] + 5
+    assert bad["static_ssim"] < good["static_ssim"]
+    assert 0.3 < good["static_fraction"] < 0.9
+
+
+def test_static_flicker_needs_a_still_area(tmp_path):
+    frames = [np.full((64, 64), 255.0 if t % 2 else 0.0, dtype=np.float32) for t in range(4)]  # changes everywhere
+    d = _write_frames(tmp_path / "x", frames)
+    with pytest.raises(ValueError, match="no static regions"):
+        static_region_flicker(d, d)
+
+
+def test_flicker_report_can_use_only_the_first_frames(tmp_path):
+    base = np.full((64, 64), 100, dtype=np.float32)
+    d = _write_frames(tmp_path / "x", [base] * 6)
+    assert flicker_report(d, d, max_frames=3)["source_ssim"] == pytest.approx(1.0)
+
+
+def test_vram_monitor_reports_peak_and_headroom(monkeypatch):
+    readings = iter([(800, 6144), (3500, 6144), (5200, 6144), (4000, 6144)])
+    monkeypatch.setattr(vram, "_query", lambda: next(readings, (4000, 6144)))
+    m = vram.VramMonitor(interval=0.01)
+    with m:
+        m._stop.wait(0.2)
+    assert (m.start_mib, m.peak_mib, m.total_mib) == (800, 5200, 6144)
+    assert "peak 5200 MiB of 6144 MiB" in m.summary() and "headroom 944" in m.summary()
+
+
+def test_vram_monitor_is_silent_without_nvidia_smi(monkeypatch):
+    monkeypatch.setattr(vram, "_query", lambda: None)
+    with vram.VramMonitor(interval=0.01) as m:
+        pass
+    assert m.summary() is None
 
 
 def test_shot_name_priority():

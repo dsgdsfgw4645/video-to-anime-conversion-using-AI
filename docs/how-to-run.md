@@ -35,7 +35,7 @@ Open **Run and Debug** (Ctrl+Shift+D), choose a configuration from the drop-down
 |---|---|---|
 | **Phase 2: convert video (config input)** | Converts the config's video slice to anime. This is the main one. | about 15 s per frame |
 | **Phase 2: short preview (config input, 4 s default)** | Same, but if `input.seconds` is empty it uses 4 seconds. | about 15 s per frame |
-| **Phase 2: flicker check (config shot)** | Prints how steady the frames are, for the shot named in the config. | a few seconds |
+| **Phase 2: flicker check (config shot)** | Prints how steady the frames are (whole frame, and static regions), for the shot named in the config. | a few seconds |
 | **Phase 1: single-frame smoke test** | Restyles ComfyUI's example image once. | about 40 s |
 | **Setup: download models** | Fetches the checkpoint, ControlNet and lineart weights. Skips what exists. | minutes, first time only |
 | **Tests: pytest** | Runs the automated tests. No GPU needed. | about 5 s |
@@ -65,7 +65,7 @@ Anything in the config can be overridden for one run, so you don't have to edit 
 
 ```powershell
 .venv\Scripts\python.exe cli.py run other.mp4 --start 10 --seconds 3 --shot test2 --denoise 0.4 --seed 7
-.venv\Scripts\python.exe cli.py flicker test2
+.venv\Scripts\python.exe cli.py flicker test2 --frames 12   # only the first 12 frames, to compare runs of different lengths
 .venv\Scripts\python.exe scripts\test_single_frame.py my_frame.png --denoise 0.45 --seed 1
 ```
 
@@ -179,6 +179,8 @@ Start it by hand only to use the ComfyUI web page: run **ComfyUI server only** (
 
 They do not test the ComfyUI graph itself. Phase 1 and a real preview do that.
 
+**Reading the output of a run:** after stylizing it prints `GPU memory: peak ... MiB of 6144 MiB used`. The pipeline peaks at about 5.4 GB, so close other programs that use the GPU. Peak memory is also why phase 3 additions may not fit.
+
 ## 13. Troubleshooting
 
 | Problem | Fix |
@@ -196,7 +198,7 @@ They do not test the ComfyUI graph itself. Phase 1 and a real preview do that.
 
 ## 14. Not built yet
 
-From `plan.md`: phase 3 (AnimateDiff, IP-Adapter, deflicker), phase 4 (LoRA training), phase 5 (matting, compositing, face pass), phase 6 (per-shot config list, web UI, cloud worker). Phase 2 is the baseline they are compared against: flicker ratio 0.951 on the dance clip (`docs/phase2-results.md`).
+From `plan.md`: phase 3 (AnimateDiff, IP-Adapter, deflicker), phase 4 (LoRA training), phase 5 (matting, compositing, face pass), phase 6 (per-shot config list, web UI, cloud worker). Phase 2 is the baseline they are compared against, on the `dance_run1` shot: static-region change 5.85 levels (lower is steadier), whole-frame ratio 0.951 (`docs/phase2-results.md`).
 
 ## 15. Change log
 
@@ -210,3 +212,4 @@ Add a line here whenever something is added or changed that affects how the proj
 | 2026-10-31 | Shot name can be set in the config (`input.shot`). |
 | 2026-10-31 | `cli.py` with no command runs `run`, so the IDE's Run button works. |
 | 2026-10-31 | The server starts and stops by itself (`comfyui.autostart`, `autostop`), and is not started when there is nothing to stylize. `flicker` defaults to the config's shot. VS Code run configurations and the interpreter setting added. This document added. |
+| 2026-10-31 | Flicker check now also measures static regions (where the source doesn't move) and takes `--frames N`. Every run prints its peak GPU memory (5399 of 6144 MiB measured). New baseline recorded. |

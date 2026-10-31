@@ -87,15 +87,18 @@ def run(
 def flicker(
     shot: Optional[str] = typer.Argument(None, help="defaults to input.shot in the config"),
     project: str = "default",
+    frames: Optional[int] = typer.Option(None, help="only use the first N frames"),
 ) -> None:
-    """Mean consecutive-frame SSIM of a stylized shot vs its source (the phase 2 baseline to beat)."""
+    """Flicker of a stylized shot: whole-frame SSIM vs the source, and change in static regions (lower = steadier)."""
     inp = load_config().get("input", {})
     shot = shot or inp.get("shot")
     if not shot:
         raise typer.BadParameter("pass a shot name or set input.shot in the config.")
     pdir = ROOT / "work" / project
-    r = flicker_report(pdir / "frames" / shot, pdir / "anime" / shot)
-    typer.echo(f"source {r['source_ssim']:.3f}  anime {r['anime_ssim']:.3f}  ratio {r['ratio']:.3f}")
+    r = flicker_report(pdir / "frames" / shot, pdir / "anime" / shot, frames)
+    typer.echo(f"whole frame:    source SSIM {r['source_ssim']:.3f}  anime SSIM {r['anime_ssim']:.3f}  ratio {r['ratio']:.3f}")
+    typer.echo(f"static regions: {r['static_fraction']:.0%} of pixels; anime changes by {r['static_diff']:.2f} levels "
+               f"(0 = steady), SSIM {r['static_ssim']:.3f}")
 
 
 if __name__ == "__main__":

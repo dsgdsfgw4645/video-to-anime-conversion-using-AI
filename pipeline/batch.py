@@ -14,6 +14,7 @@ from pipeline.comfy_client import ComfyClient
 from pipeline.server import comfy_server
 from pipeline.shot_state import SETTINGS, prepare
 from pipeline.stylize import ANIME_NODE, LINEART_NODE, build_workflow
+from pipeline.vram import VramMonitor
 
 
 def stylize_settings(cfg: dict, frames_dir: Path, seed: int | None, denoise: float | None) -> dict:
@@ -42,7 +43,7 @@ def stylize_shot(cfg: dict, project_dir: Path, shot: str,
     if not todo:
         return 0
     client = ComfyClient(cfg["comfyui"]["url"])
-    with comfy_server(client, cfg):  # starts ComfyUI if it isn't running; stops it again if it did
+    with comfy_server(client, cfg), VramMonitor() as vram:  # starts ComfyUI if needed; stops it again if it did
         for frame in tqdm(todo, desc="stylize", unit="frame"):
             with Image.open(frame) as im:
                 size = im.size
@@ -52,4 +53,6 @@ def stylize_shot(cfg: dict, project_dir: Path, shot: str,
                 entry, project_dir,
                 names={ANIME_NODE: f"anime/{shot}/{frame.name}", LINEART_NODE: f"lineart/{shot}/{frame.name}"},
             )
+    if vram.summary():
+        print(vram.summary())
     return len(todo)
