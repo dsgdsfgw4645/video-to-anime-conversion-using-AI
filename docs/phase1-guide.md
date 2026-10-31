@@ -146,6 +146,7 @@ Not graph nodes: `comfyui.url` is used by the client (its port is used when the 
 | `scripts/test_single_frame.py` | The phase-1 smoke test (section 3.1) |
 | `pipeline/stylize.py` | `load_config()` and `build_workflow()`: writes config values into the graph by node id. Shared by the smoke test and later batch stages. |
 | `pipeline/__init__.py` | Empty; makes `pipeline` importable |
+| *Phase 3 files* | `pipeline/temporal.py`, `pipeline/animatediff.py`, `scripts/make_cloud_bundle.py`, `notebooks/`, `tests/test_phase3.py`: described in `phase3-guide.md` |
 | *Phase 2 files* | `cli.py`, `pipeline/video.py`, `pipeline/batch.py`, `pipeline/metrics.py`, `tests/test_phase2.py`: described in `phase2-results.md` |
 
 ### Not ours
@@ -186,7 +187,7 @@ Python 3.11, Git, FFmpeg and a newer Visual C++ Redistributable (all via winget,
 | Item | Detail |
 |---|---|
 | ~~Test on a real photo or video frame~~ | Done in phase 2 on a real dance clip (see `phase2-results.md`). Close-up faces are still untested. |
-| Peak VRAM not measured | The run completed on 6 GB so it fits, but I never recorded the peak or the headroom. |
+| ~~Peak VRAM not measured~~ | Measured in phase 2: peak 5399 MiB of 6144 MiB (see `phase2-results.md` section 6). |
 | No `config/project.yaml` | Only the example is used. Create your own copy before changing settings. |
 | Settings partly tuned | Phase 2 lowered `denoise` to 0.4. `lineart_strength 0.8` and the prompts are still first guesses. |
 | Node ids are hard-coded | Editing the workflow in ComfyUI's UI and re-exporting will renumber nodes and break the patching in `test_single_frame.py`. |
@@ -195,7 +196,7 @@ Python 3.11, Git, FFmpeg and a newer Visual C++ Redistributable (all via winget,
 
 ### Out of phase 1's scope, so correctly absent
 
-Video ingest and encode and a CLI (built in phase 2, see `phase2-results.md`). Matting, other ControlNets, AnimateDiff, LoRAs, deflicker and compositing are phases 3 to 6 in `plan.md`.
+Video ingest and encode and a CLI (built in phase 2, see `phase2-results.md`). AnimateDiff and the deflicker (built in phase 3, see `phase3-guide.md` and `cloud-kaggle.md`). Matting, other ControlNets, LoRAs and compositing are phases 4 to 6, not built yet.
 
 ---
 

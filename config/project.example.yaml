@@ -40,7 +40,7 @@ animatediff:           # phase 3 cloud stage (cli.py animatediff): the whole sho
   timeout_seconds: 3600
   ip_adapter:
     enabled: false     # off by default: on dance_run1 AnimateDiff alone was as steady and kept the source's colors
-                       # better (docs/phase2-results.md 9b). true = add IP-Adapter (needs a reference image); use a new shot name
+                       # better (docs/phase3-guide.md section 5). true = add IP-Adapter (needs a reference image); use a new shot name
     weight: 0.5        # how strongly the reference's colors and look are applied
     reference: samples/dance/ip_reference.png   # relative to the project root; frame 28 of the dance_run1 anime output
 

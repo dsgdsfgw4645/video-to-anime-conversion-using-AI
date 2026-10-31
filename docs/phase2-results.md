@@ -1,7 +1,7 @@
 # Phase 2 Guide: the frame pipeline MVP
 
 Video in, anime video out, one frame at a time: ingest -> per-frame img2img + lineart ControlNet -> encode.
-This is the baseline that phase 3 (consistency) has to beat. It reuses the phase 1 graph unchanged.
+This is the baseline that phase 3 (consistency) has to beat. It reuses the phase 1 graph unchanged. **The phase 3 results are in [phase3-guide.md](phase3-guide.md)**, measured against this baseline.
 
 ## 1. How a run flows
 
@@ -72,86 +72,16 @@ Limits: the static metric rests on how much of the shot is still (87% here, a mo
 
 Measured on a real run (`vram_check`, 6 frames, fresh server, RTX 2060 6 GB): **peak 5399 MiB of 6144 MiB used, headroom 745 MiB**, with about 850 MiB in use by the desktop before the run. So the pipeline itself needs roughly 4.5 GB. Every run now prints this line (`pipeline/vram.py` polls `nvidia-smi`). The figure is the whole GPU, so close other GPU programs when you compare runs.
 
-What it means for phase 3: there is less than 1 GB of headroom. Adding AnimateDiff, IP-Adapter or more ControlNets at 0.4 MP will probably not fit; expect to need a lower resolution, fewer frames per batch, or the cloud GPU the plan already allows for.
+What it means for phase 3: there is less than 1 GB of headroom. Adding AnimateDiff, IP-Adapter or more ControlNets at 0.4 MP will probably not fit; expect to need a lower resolution, fewer frames per batch, or the cloud GPU the plan already allows for. (This is why the AnimateDiff stage runs on Kaggle; the deflicker is CPU only and needs no GPU memory. See `phase3-guide.md`.)
 
 ## 7. Known issues and pending
 
-- The checkpoint lightens skin tones and re-colors clothing between source and anime. Phase 3 (IP-Adapter) or phase 4 (style/actor LoRA) should fix it.
+- The checkpoint lightens skin tones and re-colors clothing between source and anime, differently on every frame. Phase 3's AnimateDiff keeps the colors much steadier; IP-Adapter did not help (`phase3-guide.md` section 5). A style/actor LoRA (phase 4) is still the way to change the checkpoint's look.
 - Small figures in wide shots lose faces and detail at 0.4 MP.
-- No temporal consistency: each frame is independent apart from the shared seed.
+- No temporal consistency in this per-frame stage: each frame is independent apart from the shared seed. Phase 3 adds it (`phase3-guide.md`).
 - No scene detection or multi-shot handling yet (the `input:` section would become a list of shots in phase 6).
 - Source frames are saved at full resolution (about 3 MB each at 1080p), so a long clip needs several GB under `work/`.
 
-## 8. Phase 3 so far: flow-warp deflicker
+## 8. Phase 3
 
-`cli.py deflicker dance_run1` (`pipeline/temporal.py`, CPU only, about 10 s for 48 frames) blends each stylized frame with the previous output warped along the optical flow (Farneback) of the source frames; where the warp does not reproduce the source it is ignored. Same 48 frames as the baseline:
-
-| | whole-frame ratio | static change (levels) | static SSIM |
-|---|---|---|---|
-| baseline `anime` | 0.951 | 5.85 | 0.873 |
-| `deflicker` (strength 0.6, threshold 25) | 1.006 | **3.78** | 0.918 |
-
-The full blend (sigma 0, every frequency) is 35% steadier where nothing moves, but softens moving limbs, and above strength 0.7 it smears trails behind them. The default is now `temporal.lowpass_sigma: 2` with strength 0.9 (tuned, see the sweep below), which blends only coarse colors and tones so the fresh frame keeps its edges:
-
-| setting | whole-frame ratio | static change | static SSIM |
-|---|---|---|---|
-| strength 0.8, sigma 3 (default) | 0.981 | 4.34 | 0.897 |
-| strength 0.9, sigma 3 | 0.983 | 4.23 | 0.898 |
-| strength 0.9, sigma 6 | 0.968 | 4.78 | 0.886 |
-
-This removes about 26% of the flicker (the rest is edges redrawn each frame). On the highest-motion frame (10) edges and feet stay as sharp as the baseline, with a faint tint of the previous frame on one dancer's trousers. The table above (3.78) is the sigma 0 full blend. Not yet judged by eye (check `out/dance_run1_deflicker.mp4` for ghosting on moving limbs), strength is untuned, and AnimateDiff / IP-Adapter are still pending.
-
-Tuning sweep on `dance_run1` (sharpness = Laplacian variance relative to the unprocessed anime frames; 1.00 = as sharp):
-
-| strength | sigma | threshold | static change | static SSIM | sharpness |
-|---|---|---|---|---|---|
-| 0.6 | 0 (full blend) | 25 | 3.78 | 0.918 | 0.58 |
-| 0.9 | 1.5 | 25 | 3.64 | 0.912 | 0.93 |
-| 1.0 | 1.5 | 25 | 3.51 | 0.913 | 0.92 |
-| **0.9** | **2** | 25 | **3.88** | 0.906 | **0.97** |
-| 1.0 | 2 | 25 | 3.77 | 0.907 | 0.97 |
-| 0.8 | 3 | 25 | 4.34 | 0.897 | 1.00 |
-| 1.0 | 3 | 15 | 4.26 | 0.898 | 1.00 |
-
-Chosen: strength 0.9, sigma 2. A lower error threshold (15) was slightly worse everywhere. One clip, one frame inspected by eye; retune on other footage.
-
-## 9. Phase 3 result: AnimateDiff + IP-Adapter on Kaggle (T4), `dance_run1`
-
-Same 48 frames, denoise 0.4, seed 12345, IP-Adapter weight 0.5 with a frame-28 reference. Lower is steadier in every column.
-
-| stage | static change (levels) | color flicker | color drift |
-|---|---|---|---|
-| per-frame baseline (`anime`) | 5.85 | 1.86 | 2.60 |
-| per-frame + local deflicker (`deflicker`) | 3.88 | 0.82 | 1.95 |
-| AnimateDiff + IP-Adapter (`animatediff`) | 4.30 | 0.76 | 1.63 |
-| **AnimateDiff + IP-Adapter + deflicker** (`deflicker_animatediff`) | **3.88** | **0.57** | **1.55** |
-
-`cli.py flicker <shot> --stage <stage>` prints all of these (whole-frame ratios: 0.951, 0.992, 0.985, 0.994).
-
-**Color metric** (`pipeline/metrics.py: color_consistency`): for each cell of a 32x32 grid, the stylizer's color offset is (stylized Lab chroma - source Lab chroma). A steady stylizer keeps that offset constant while things move. `color_flicker` is the mean frame-to-frame change of the offset (color jumps), `color_drift` the spread of the offset over the whole shot (outfits changing color over time). Units are Lab chroma (a/b), 0 = steady. It is a mean over the whole frame, so it understates changes on small subjects (the dancers are a small part of the frame); look at the video as well.
-
-What the numbers say:
-- **Color jumps (flicker):** AnimateDiff cuts it by 59% (1.86 to 0.76); the local deflicker alone gets 56% (0.82). With both, 69% (0.57).
-- **Slow color drift:** only AnimateDiff + IP-Adapter helps a lot (2.60 to 1.63, 37%). The deflicker alone cuts it by 25%, because it carries the previous frame's colors forward and cannot correct a color that is already wrong. The two together reach 1.55.
-- **Static flicker (grayscale):** the per-frame route plus deflicker already equals the full cloud route (3.88 both). The cloud route earns its cost in color steadiness, not in grayscale flicker.
-- **Best result:** AnimateDiff + IP-Adapter + deflicker is the steadiest on all three measures. Frame by frame it keeps skin tones and outfits steady across the shot; its limbs and crowd are blockier and slightly distorted.
-- **Not yet separated:** how much of the color steadiness is AnimateDiff and how much is IP-Adapter (needs an AnimateDiff-only run under a new shot name).
-
-### 9b. Does IP-Adapter help? AnimateDiff alone vs with IP-Adapter (same frames, seed, denoise)
-
-Shot `dance_run1_noip` is `dance_run1` with `animatediff.ip_adapter.enabled: false` (frames byte-identical).
-
-| stage | static change | color flicker | color drift |
-|---|---|---|---|
-| AnimateDiff alone | 4.34 | **0.69** | **1.47** |
-| AnimateDiff + IP-Adapter 0.5 | **4.30** | 0.76 | 1.63 |
-| AnimateDiff alone + deflicker | 3.97 | **0.53** | **1.40** |
-| AnimateDiff + IP-Adapter 0.5 + deflicker | **3.88** | 0.57 | 1.55 |
-| AnimateDiff + IP-Adapter 0.5, reference = frame 20 of the AnimateDiff-only output (`dance_run1_refad`) | 4.61 | 0.73 | 1.53 |
-| the same + deflicker | 4.24 | 0.54 | 1.45 |
-
-- **AnimateDiff is what steadies the shot.** IP-Adapter at weight 0.5 with the frame-28 reference gives no measurable gain in steadiness: static change is the same, and the color numbers are about 10% worse with it (single clip and seed, so treat small differences with care).
-- **What it does change:** the look. With IP-Adapter the palette is more saturated and takes on the reference's colors (red hair and red socks appear that are not in the source). AnimateDiff alone stays closer to the source's colors (skin tones, a blue skirt).
-- **Likely cause:** the reference (frame 28 of the per-frame output) itself contains the recolored outfits (reds and oranges) that the per-frame stylizer invented, so IP-Adapter pushes those colors onto every frame. A reference whose colors match the source, or a lower weight, is untested.
-- **Better reference tried (`dance_run1_refad`):** with a reference taken from the AnimateDiff-only output, the stray red accents are gone and the color numbers fall between the other two runs, but static flicker is worse (4.61 against 4.34) and nothing beats AnimateDiff alone.
-- **Decision:** IP-Adapter is off by default (`animatediff.ip_adapter.enabled: false`). Untested: weights below 0.5, and footage where the checkpoint recolors more strongly; turn it on with `--set animatediff.ip_adapter.enabled=true` when packing.
+The phase 3 work (the flow-warp deflicker and AnimateDiff on a cloud GPU), its tuning and its results measured against this baseline are in [phase3-guide.md](phase3-guide.md).

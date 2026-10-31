@@ -105,9 +105,11 @@ Every stage reads and writes `work/<project>/<stage>/<shot>/frame_%05d.png`. Thi
 Python 3.11, ffmpeg, PySceneDetect, OpenCV, PyTorch, ComfyUI, and these ComfyUI custom nodes: AnimateDiff-Evolved, Advanced-ControlNet, IPAdapter_plus, controlnet_aux preprocessors, VideoHelperSuite. Also RobustVideoMatting / SAM2, InsightFace, RAFT, RIFE, kohya_ss, Typer, and later FastAPI.
 
 ## Phased roadmap
+*Status: phases 1, 2 and 3 are done; 4 to 6 are not started.*
 1. **Setup:** install ComfyUI and models locally. Prove one-frame img2img with ControlNet lineart on the 2060.
 2. **Frame pipeline MVP:** ingest → per-frame img2img → encode. This is the original Corridor approach, used as the baseline.
 3. **Consistency:** add AnimateDiff, IP-Adapter and the deflicker/flow blend. Compare flicker against the baseline.
+   *Status: done (see `docs/phase3-guide.md`). What was built: a local optical-flow deflicker (`pipeline/temporal.py`, CPU) and a one-pass AnimateDiff + lineart ControlNet stage that runs on a Kaggle GPU (`pipeline/animatediff.py`, `notebooks/`). Differences from the plan: IP-Adapter is built but **off by default** (it did not help on the test clip); the workflow is `workflows/animatediff_lineart_api.json` (lineart only, no depth/openpose); the deflicker uses OpenCV Farneback flow, not RAFT/EbSynth/RIFE (RAFT is an untried upgrade). Best result on `dance_run1`: AnimateDiff alone + deflicker. Tuned on one clip only.*
 4. **Training:** build the style LoRA and actor LoRAs on cloud GPU, then integrate them.
 5. **Composite and polish:** matting, separate background, face pass, anime VFX, audio.
 6. **Productize:** project.yaml per-shot overrides, resumable jobs, FastAPI web UI, cloud worker (RunPod serverless running the same ComfyUI image).

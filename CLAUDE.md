@@ -18,10 +18,13 @@ scripts\start_comfyui.ps1                                  # ComfyUI server on 1
 .venv\Scripts\python.exe cli.py                      # no command = `run` with the config's input (IDE run button)
 .venv\Scripts\python.exe cli.py run [video]                # config's slice (`seconds: null` = whole clip); re-run to resume
 .venv\Scripts\python.exe cli.py flicker <shot>   # flicker: whole-frame SSIM + static-region change (the phase 3 baseline to beat); --frames N
+.venv\Scripts\python.exe cli.py deflicker [shot] [--source animatediff]   # phase 3 local deflicker (CPU) -> deflicker[_animatediff]/<shot>
+.venv\Scripts\python.exe scripts\make_cloud_bundle.py [shot] [--set KEY=VALUE]  # zip for the Kaggle notebook (docs/cloud-kaggle.md); cli.py animatediff itself only runs on a 16 GB GPU
+.venv\Scripts\python.exe cli.py flicker <shot> --stage animatediff|deflicker|deflicker_animatediff   # measure a phase 3 stage; also prints color flicker/drift
 .venv\Scripts\python.exe -m pytest tests -q    # phase 2 tests; no GPU or ComfyUI needed
 ```
 
-Full from-scratch setup is in `README.md`. `docs/how-to-run.md` is the user's run reference (IDE and command prompt, per phase, settings, troubleshooting) with a change log: **update it, including the change log, whenever you add or change anything that affects how the project is run**. A single-frame run takes about 40 s on the RTX 2060 (6 GB). `docs/phase1-guide.md` maps every model file to the workflow node that loads it and lists what phase 1 still has pending; keep it in sync when models or nodes change. `docs/phase2-results.md` covers the frame pipeline, the flicker baseline and known issues; update it when phase 3 changes the baseline.
+Full from-scratch setup is in `README.md`. `docs/how-to-run.md` is the user's run reference (IDE and command prompt, per phase, settings, troubleshooting) with a change log: **update it, including the change log, whenever you add or change anything that affects how the project is run**. A single-frame run takes about 40 s on the RTX 2060 (6 GB). `docs/phase1-guide.md` maps every model file to the workflow node that loads it and lists what phase 1 still has pending; keep it in sync when models or nodes change. `docs/phase3-guide.md` covers phase 3 (the deflicker, the Kaggle AnimateDiff stage, tuning and all results); update it when those settings or results change, and `docs/cloud-kaggle.md` when the notebook or bundle steps change. `docs/phase2-results.md` covers the frame pipeline, the flicker baseline and known issues; update it when phase 3 changes the baseline.
 
 ## Architecture
 

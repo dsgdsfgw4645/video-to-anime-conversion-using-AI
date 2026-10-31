@@ -3,7 +3,9 @@
 Live-action video to consistent anime, in the style of Corridor Crew's *Anime Rock Paper Scissors*.
 Full design and roadmap: [plan.md](plan.md).
 
-## Setup (phase 1) (Windows, RTX 2060 6 GB)
+## Setup (Windows, RTX 2060 6 GB)
+
+This repository holds the project's code and docs. It does **not** hold `.venv/` (the Python environment, about 6 GB), `third_party/` (ComfyUI and the models, about 3 GB) or `work/` (everything a run generates). You create `.venv` and `third_party` once with the commands below; `work/` appears when you run the project. On a new computer: `git clone https://github.com/dsgdsfgw4645/video-to-anime-conversion-using-AI.git`, open the folder, then follow these steps.
 
 Prerequisites (installed via winget): Python 3.11, Git, FFmpeg, and a current Visual C++ Redistributable
 (PyTorch fails with `WinError 1114` on an old one).
@@ -20,7 +22,7 @@ git clone --depth 1 https://github.com/Fannovel16/comfyui_controlnet_aux.git thi
 .venv\Scripts\python.exe scripts\download_models.py
 ```
 
-The full run reference, for the IDE and the command prompt, is in [docs/how-to-run.md](docs/how-to-run.md). In VS Code, pick a run configuration in Run and Debug (Ctrl+Shift+D); ComfyUI starts by itself when needed.
+Then run the tests (`.venv\Scripts\python.exe -m pytest tests -q`) and the smoke test below to check everything works. The full run reference, for the IDE and the command prompt, is in [docs/how-to-run.md](docs/how-to-run.md). In VS Code, pick a run configuration in Run and Debug (Ctrl+Shift+D); ComfyUI starts by itself when needed.
 
 ## Run the smoke test
 
@@ -44,7 +46,7 @@ scripts\start_comfyui.ps1                                   # optional: cli.py s
 .venv\Scripts\python.exe cli.py preview other.mp4 --start 10 --seconds 3 --denoise 0.4
 .venv\Scripts\python.exe cli.py                             # no command = run (works from an IDE's run button)
 .venv\Scripts\python.exe cli.py run                         # config's slice; seconds: null = whole clip
-.venv\Scripts\python.exe cli.py flicker <shot>              # flicker: whole-frame SSIM and change in static regions (lower = steadier); --frames N
+.venv\Scripts\python.exe cli.py flicker <shot>              # flicker: whole-frame SSIM, change in static regions, and color steadiness (lower = steadier); --frames N
 .venv\Scripts\python.exe -m pytest tests -q                 # no GPU or ComfyUI needed
 ```
 
@@ -55,24 +57,38 @@ Expect about 15 s per frame on the RTX 2060 (12 frames per second of video). A s
 [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Beautiful_Traditional_South_African_Dance!.webm)) is in `samples/dance/`.
 Results and the flicker baseline are in [docs/phase2-results.md](docs/phase2-results.md).
 
+## Steadier video (phase 3)
+
+```powershell
+.venv\Scripts\python.exe cli.py deflicker                  # local, CPU, seconds: blend frames along the source's motion
+.venv\Scripts\python.exe cli.py flicker --stage deflicker  # measure it
+.venv\Scripts\python.exe scripts\make_cloud_bundle.py       # pack the zip for the Kaggle AnimateDiff notebook
+```
+
+The AnimateDiff stage needs about 16 GB of GPU memory, so it runs in a Kaggle notebook (`notebooks/kaggle_animatediff.ipynb`), not on this machine. Upload the zip as a Kaggle dataset, run the notebook, unzip the result into the project folder and measure it with `cli.py flicker --stage animatediff`. Step by step: [docs/how-to-run.md](docs/how-to-run.md#7-phase-3-steadier-video-deflicker-and-the-cloud-stage) and [docs/cloud-kaggle.md](docs/cloud-kaggle.md). Design, tuning and results: [docs/phase3-guide.md](docs/phase3-guide.md).
+
 ## Layout
 
 | Path | Purpose |
 |---|---|
-| `cli.py` | `preview`, `run`, `flicker` commands; no command means `run` |
+| `cli.py` | `preview`, `run`, `flicker`, `deflicker`, `animatediff`, `encode` commands; no command means `run` |
 | `pipeline/comfy_client.py` | ComfyUI HTTP API client (upload, queue, wait, download) |
 | `pipeline/stylize.py` | config loading and `build_workflow()` (patches the graph by node id) |
 | `pipeline/video.py` | ffmpeg frame extraction and encoding |
 | `pipeline/batch.py` | resumable per-frame stylize loop |
 | `pipeline/shot_state.py` | records each shot's settings; stops a run that would overwrite a shot |
 | `pipeline/server.py` | starts ComfyUI when it isn't running, stops it afterwards |
-| `pipeline/metrics.py` | flicker metrics (whole frame and static regions) |
+| `pipeline/metrics.py` | flicker metrics (whole frame, static regions, color) |
+| `pipeline/temporal.py` | phase 3 deflicker (optical-flow blend, CPU) |
+| `pipeline/animatediff.py` | phase 3 cloud stage: one AnimateDiff pass over a whole shot (needs about 16 GB GPU) |
 | `pipeline/vram.py` | peak GPU memory of a run |
 | `tests/` | automated tests (no GPU needed) |
-| `docs/` | `how-to-run.md` (run reference), phase guides |
+| `docs/` | `how-to-run.md` (run reference), `phase1-guide.md`, `phase2-results.md`, `phase3-guide.md`, `cloud-kaggle.md` |
 | `.vscode/` | interpreter setting and run configurations |
 | `samples/` | test clips |
 | `workflows/` | ComfyUI API-format workflow graphs |
-| `scripts/` | model download, server launcher, phase 1 smoke test |
+| `scripts/` | model download, server launcher, phase 1 smoke test, `make_cloud_bundle.py` (zip for Kaggle) |
+| `notebooks/` | the Kaggle notebook for the cloud stage |
 | `config/` | project settings |
-| `third_party/ComfyUI` | local ComfyUI checkout (not ours) |
+| `third_party/ComfyUI` | local ComfyUI checkout (not ours); git-ignored, created by the setup commands |
+| `.venv/`, `work/` | git-ignored: the Python environment (setup commands) and everything a run generates |
