@@ -182,6 +182,18 @@ def test_cli_stops_with_message_and_keeps_the_old_video(clip, tmp_path, monkeypa
     assert (out.read_bytes(), _snapshot(tmp_path / "work" / "default" / "anime" / "mine")) == before
 
 
+def test_cli_with_no_command_runs_the_config(clip, tmp_path, monkeypatch):
+    from typer.testing import CliRunner
+    import cli
+    _fake_comfy(monkeypatch)
+    monkeypatch.setattr(cli, "ROOT", tmp_path)
+    (tmp_path / "in.mp4").write_bytes(clip.read_bytes())
+    monkeypatch.setattr(cli, "load_config", lambda: {**CFG, "input": {"video": "in.mp4", "seconds": 1, "shot": "auto"}})
+    result = CliRunner().invoke(cli.app, [])                                # what `python cli.py` does
+    assert result.exit_code == 0, result.output
+    assert (tmp_path / "work" / "default" / "out" / "auto.mp4").exists()
+
+
 def test_shot_name_priority():
     from cli import resolve_shot
     v = Path("samples/clip.mp4")

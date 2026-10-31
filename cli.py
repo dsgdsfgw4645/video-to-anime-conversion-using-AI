@@ -3,6 +3,7 @@ r"""Video -> anime CLI (phase 2: ingest -> per-frame img2img -> encode).
   .venv\Scripts\python.exe cli.py preview            # video/start/seconds from config `input:`
   .venv\Scripts\python.exe cli.py preview other.mp4 --start 10 --seconds 3   # CLI overrides config
   .venv\Scripts\python.exe cli.py run                # config's slice; set seconds: null for the whole clip
+  .venv\Scripts\python.exe cli.py                  # no command = run, so an IDE's run button works
 Re-running the same command resumes: finished frames are skipped.
 """
 from pathlib import Path
@@ -47,6 +48,13 @@ def _process(video: Optional[Path], project: str, shot: Optional[str], start: Op
     typer.echo(f"stylized {made} new frames")
     out = encode(pdir / "anime" / shot, pdir / "out" / f"{shot}.mp4", fps, video, start, seconds)
     typer.echo(f"wrote {out}")
+
+
+@app.callback(invoke_without_command=True)
+def main(ctx: typer.Context) -> None:
+    """With no command (e.g. the IDE's run button), run the config's input slice."""
+    if ctx.invoked_subcommand is None:
+        run(video=None, project="default", shot=None, start=None, seconds=None, seed=None, denoise=None)
 
 
 @app.command()

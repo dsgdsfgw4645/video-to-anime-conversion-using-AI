@@ -15,6 +15,7 @@ scripts\start_comfyui.ps1                                  # ComfyUI server on 1
 .venv\Scripts\python.exe scripts\test_single_frame.py [image] [--denoise 0.45] [--seed 1]   # outputs to work/phase1/
 .venv\Scripts\python.exe scripts\download_models.py        # idempotent; fetches checkpoint, ControlNet and netG.pth into third_party/ComfyUI
 .venv\Scripts\python.exe cli.py preview [video] [--start 5 --seconds 4]   # defaults from config `input:`; ~15 s/frame; output work/default/out/<shot>.mp4
+.venv\Scripts\python.exe cli.py                      # no command = `run` with the config's input (IDE run button)
 .venv\Scripts\python.exe cli.py run [video]                # config's slice (`seconds: null` = whole clip); re-run to resume
 .venv\Scripts\python.exe cli.py flicker <shot>   # consecutive-frame SSIM, stylized vs source (phase 2 baseline)
 .venv\Scripts\python.exe -m pytest tests -q    # phase 2 tests; no GPU or ComfyUI needed

@@ -40,6 +40,7 @@ command-line options override them.
 scripts\start_comfyui.ps1                                   # terminal 1
 .venv\Scripts\python.exe cli.py preview                     # terminal 2: config's slice (4 s if seconds is unset)
 .venv\Scripts\python.exe cli.py preview other.mp4 --start 10 --seconds 3 --denoise 0.4
+.venv\Scripts\python.exe cli.py                             # no command = run (works from an IDE's run button)
 .venv\Scripts\python.exe cli.py run                         # config's slice; seconds: null = whole clip
 .venv\Scripts\python.exe cli.py flicker <shot>              # frame-to-frame SSIM, stylized vs source
 .venv\Scripts\python.exe -m pytest tests -q                 # no GPU or ComfyUI needed
