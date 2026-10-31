@@ -117,16 +117,22 @@ Chosen: strength 0.9, sigma 2. A lower error threshold (15) was slightly worse e
 
 ## 9. Phase 3 result: AnimateDiff + IP-Adapter on Kaggle (T4), `dance_run1`
 
-Same 48 frames, denoise 0.4, seed 12345, IP-Adapter weight 0.5 with a frame-28 reference:
+Same 48 frames, denoise 0.4, seed 12345, IP-Adapter weight 0.5 with a frame-28 reference. Lower is steadier in every column.
 
-| stage | whole-frame ratio | static change (levels) | static SSIM |
+| stage | static change (levels) | color flicker | color drift |
 |---|---|---|---|
-| per-frame baseline (`anime`) | 0.951 | 5.85 | 0.873 |
-| per-frame + local deflicker (`deflicker`) | 0.992 | 3.88 | 0.906 |
-| **AnimateDiff + IP-Adapter** (`animatediff`) | 0.985 | **4.30** | 0.900 |
-| AnimateDiff + IP-Adapter + deflicker (`deflicker_animatediff`) | 0.994 | 3.88 | 0.908 |
+| per-frame baseline (`anime`) | 5.85 | 1.86 | 2.60 |
+| per-frame + local deflicker (`deflicker`) | 3.88 | 0.82 | 1.95 |
+| AnimateDiff + IP-Adapter (`animatediff`) | 4.30 | 0.76 | 1.63 |
+| **AnimateDiff + IP-Adapter + deflicker** (`deflicker_animatediff`) | **3.88** | **0.57** | **1.55** |
 
-- AnimateDiff + IP-Adapter alone removes 26% of the static flicker (5.85 to 4.30); the cheap local deflicker removes 34%.
-- The deflicker on top of AnimateDiff reaches the same 3.88 as the deflicker on the per-frame output. By this metric the two routes end up equal, so the metric alone does not justify the cloud step.
-- **What the metric misses:** the per-frame baseline recolours the dancers between frames (outfits go red, then orange, then grey) and the crowd's clothes change colour; the AnimateDiff output keeps skin tones and outfits steady across the shot, but its limbs and crowd are blockier and slightly distorted. The static-region metric is grayscale and cannot see colour drift.
-- Not yet separated: how much of the colour steadiness comes from AnimateDiff and how much from IP-Adapter (needs an AnimateDiff-only run under a new shot name).
+`cli.py flicker <shot> --stage <stage>` prints all of these (whole-frame ratios: 0.951, 0.992, 0.985, 0.994).
+
+**Color metric** (`pipeline/metrics.py: color_consistency`): for each cell of a 32x32 grid, the stylizer's color offset is (stylized Lab chroma - source Lab chroma). A steady stylizer keeps that offset constant while things move. `color_flicker` is the mean frame-to-frame change of the offset (color jumps), `color_drift` the spread of the offset over the whole shot (outfits changing color over time). Units are Lab chroma (a/b), 0 = steady. It is a mean over the whole frame, so it understates changes on small subjects (the dancers are a small part of the frame); look at the video as well.
+
+What the numbers say:
+- **Color jumps (flicker):** AnimateDiff cuts it by 59% (1.86 to 0.76); the local deflicker alone gets 56% (0.82). With both, 69% (0.57).
+- **Slow color drift:** only AnimateDiff + IP-Adapter helps a lot (2.60 to 1.63, 37%). The deflicker alone cuts it by 25%, because it carries the previous frame's colors forward and cannot correct a color that is already wrong. The two together reach 1.55.
+- **Static flicker (grayscale):** the per-frame route plus deflicker already equals the full cloud route (3.88 both). The cloud route earns its cost in color steadiness, not in grayscale flicker.
+- **Best result:** AnimateDiff + IP-Adapter + deflicker is the steadiest on all three measures. Frame by frame it keeps skin tones and outfits steady across the shot; its limbs and crowd are blockier and slightly distorted.
+- **Not yet separated:** how much of the color steadiness is AnimateDiff and how much is IP-Adapter (needs an AnimateDiff-only run under a new shot name).

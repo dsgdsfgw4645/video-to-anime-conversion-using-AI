@@ -184,3 +184,33 @@ def test_animatediff_names_missing_custom_nodes_instead_of_queueing(tmp_path, mo
     with pytest.raises(RuntimeError, match="ACN_ControlNetLoaderAdvanced.*RESTART"):
         ad.animatediff_shot(load_config(), tmp_path, "s")
     assert not list((tmp_path / "animatediff" / "s").glob("frame_*.png"))
+
+
+# ---- color consistency metric ----
+from pipeline.metrics import color_consistency
+
+
+def _color_shot(tmp_path, offsets):
+    """Source: a fixed colorful pattern. Stylized: the same pattern with a per-frame color offset (R, G, B)."""
+    rng = np.random.default_rng(3)
+    base = cv2.GaussianBlur(rng.integers(40, 200, (64, 64, 3), dtype=np.uint8), (0, 0), 4).astype(int)
+    anime = [np.clip(base + np.array(o), 0, 255).astype(np.uint8) for o in offsets]
+    _write(tmp_path / "frames" / "c", [base.astype(np.uint8)] * len(offsets))
+    _write(tmp_path / "anime" / "c", anime)
+    return color_consistency(tmp_path / "frames" / "c", tmp_path / "anime" / "c")
+
+
+def test_a_constant_color_shift_counts_as_steady(tmp_path):
+    r = _color_shot(tmp_path, [(30, -20, 10)] * 8)
+    assert r["color_flicker"] < 0.5 and r["color_drift"] < 0.5
+
+
+def test_random_recoloring_is_flagged_as_flicker_and_drift(tmp_path):
+    rng = np.random.default_rng(4)
+    r = _color_shot(tmp_path, [tuple(rng.integers(-40, 40, 3)) for _ in range(8)])
+    assert r["color_flicker"] > 5 and r["color_drift"] > 3
+
+
+def test_slow_color_drift_shows_in_drift_more_than_in_flicker(tmp_path):
+    r = _color_shot(tmp_path, [(i * 8, 0, -i * 8) for i in range(8)])
+    assert r["color_drift"] > 2 * r["color_flicker"] > 0

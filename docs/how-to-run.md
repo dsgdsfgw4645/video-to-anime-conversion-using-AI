@@ -39,7 +39,7 @@ Open **Run and Debug** (Ctrl+Shift+D), choose a configuration from the drop-down
 | **Phase 3 cloud: deflicker / flicker check / encode ...** | After unzipping the notebook's result at the project root: deflicker the AnimateDiff frames, measure `animatediff` or `deflicker_animatediff`, or encode them to mp4. | seconds |
 | **Phase 3: deflicker (config shot)** | Blends each stylized frame with the motion-warped previous one (CPU only), writes `deflicker/<shot>` and `out/<shot>_deflicker.mp4`. The shot must already be stylized. | about 10 s for 48 frames |
 | **Phase 3: flicker check of the deflickered shot** | Same measurement as the Phase 2 check, on the deflickered frames. | a few seconds |
-| **Phase 2: flicker check (config shot)** | Prints how steady the frames are (whole frame, and static regions), for the shot named in the config. | a few seconds |
+| **Phase 2: flicker check (config shot)** | Prints how steady the frames are (whole frame, static regions, and color), for the shot named in the config. | a few seconds |
 | **Phase 1: single-frame smoke test** | Restyles ComfyUI's example image once. | about 40 s |
 | **Setup: download models** | Fetches the checkpoint, ControlNet and lineart weights. Skips what exists. | minutes, first time only |
 | **Tests: pytest** | Runs the automated tests. No GPU needed. | about 5 s |
@@ -226,3 +226,4 @@ Add a line here whenever something is added or changed that affects how the proj
 | 2026-10-31 | Deflicker defaults tuned to `strength: 0.9`, `lowpass_sigma: 2` (static change 3.88 vs 5.85 baseline, 97% of the baseline sharpness). |
 | 2026-10-31 | Cloud stage added: `cli.py animatediff` (one AnimateDiff + lineart ControlNet + IP-Adapter pass, ~16 GB GPU), `scripts/make_cloud_bundle.py`, `notebooks/kaggle_animatediff.ipynb`, `download_models.py --cloud`, `animatediff:` config section, `deflicker --source`, `encode --stage`. Guide: `docs/cloud-kaggle.md`. Ran end to end locally on a small test, then confirmed working on Kaggle. |
 | 2026-10-31 | Cloud stage fixes found by running it: ComfyUI-Advanced-ControlNet nodes (stock ControlNet fails with sliding windows); `vram.py` no longer uses a Windows-only flag; `server.py` starts ComfyUI itself on Linux. |
+| 2026-10-31 | `cli.py flicker` also prints a color-steadiness line (frame-to-frame change and drift over the shot, Lab chroma units, lower = steadier). |

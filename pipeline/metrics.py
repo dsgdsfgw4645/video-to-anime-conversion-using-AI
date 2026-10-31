@@ -7,15 +7,19 @@ Two views of how steady a stylized shot is:
 * static regions: only pixels where the source itself doesn't change between two frames. Anything the
   stylized shot changes there is pure flicker, since nothing moved. This is the number phase 3+ must
   improve on; it ignores real motion, which the whole-frame number can't.
+* color: how steady the stylizer's color mapping is. Both numbers are grayscale-blind otherwise, and a
+  per-frame stylizer recolors things (an outfit going red, then orange) while the source stays the same.
 """
 from pathlib import Path
 
 import numpy as np
 from PIL import Image, ImageFilter
+from skimage.color import rgb2lab
 from skimage.metrics import structural_similarity
 
 SIZE = (256, 256)
 STATIC_THRESHOLD = 6.0   # a source pixel is "static" if it changes by less than this (0-255 levels)
+COLOR_GRID = (32, 32)    # color is compared per cell of this grid (each cell = the mean color of its region)
 MIN_STATIC_FRACTION = 0.02  # pairs with less static area than this are skipped (a pan or a cut)
 
 
@@ -66,8 +70,32 @@ def static_region_flicker(source_dir: Path, anime_dir: Path, size: tuple[int, in
             "static_ssim": float(np.mean(ssims))}
 
 
+def _chroma_grid(path: Path) -> np.ndarray:
+    """Mean Lab a/b (chroma) of each grid cell, shape (rows, cols, 2)."""
+    with Image.open(path) as im:
+        small = im.convert("RGB").resize(COLOR_GRID, Image.BOX)   # BOX = mean of each cell
+    return rgb2lab(np.asarray(small, dtype=np.float64) / 255.0)[..., 1:]
+
+
+def color_consistency(source_dir: Path, anime_dir: Path, max_frames: int | None = None) -> dict[str, float]:
+    """How steady the stylized colors are, relative to the source (Lab chroma units; 0 = perfectly steady).
+
+    For every grid cell the stylizer's color offset is (stylized chroma - source chroma). A steady stylizer
+    keeps that offset constant while the source moves; a recoloring one does not.
+    color_flicker: mean change of the offset between consecutive frames (frame-to-frame color jumps).
+    color_drift: mean over cells of the offset's spread (std) over the whole shot (outfits changing color
+    over time, including slow changes that color_flicker does not see).
+    """
+    src_files, anime_files = _frames(source_dir, max_frames), _frames(anime_dir, max_frames)
+    n = min(len(src_files), len(anime_files))
+    offset = np.stack([_chroma_grid(anime_files[i]) - _chroma_grid(src_files[i]) for i in range(n)])
+    return {"color_flicker": float(np.linalg.norm(np.diff(offset, axis=0), axis=-1).mean()),
+            "color_drift": float(np.linalg.norm(offset.std(axis=0), axis=-1).mean())}
+
+
 def flicker_report(source_dir: Path, anime_dir: Path, max_frames: int | None = None) -> dict[str, float]:
     src = mean_consecutive_ssim(source_dir, max_frames=max_frames)
     out = mean_consecutive_ssim(anime_dir, max_frames=max_frames)
     return {"source_ssim": src, "anime_ssim": out, "ratio": out / src,
-            **static_region_flicker(source_dir, anime_dir, max_frames=max_frames)}
+            **static_region_flicker(source_dir, anime_dir, max_frames=max_frames),
+            **color_consistency(source_dir, anime_dir, max_frames)}

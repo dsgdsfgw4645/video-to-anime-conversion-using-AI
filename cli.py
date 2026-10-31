@@ -169,6 +169,8 @@ def flicker(
     typer.echo(f"whole frame:    source SSIM {r['source_ssim']:.3f}  anime SSIM {r['anime_ssim']:.3f}  ratio {r['ratio']:.3f}")
     typer.echo(f"static regions: {r['static_fraction']:.0%} of pixels; anime changes by {r['static_diff']:.2f} levels "
                f"(0 = steady), SSIM {r['static_ssim']:.3f}")
+    typer.echo(f"color:          frame-to-frame change {r['color_flicker']:.2f}, drift over the shot {r['color_drift']:.2f} "
+               "(Lab chroma units, 0 = steady)")
 
 
 if __name__ == "__main__":
