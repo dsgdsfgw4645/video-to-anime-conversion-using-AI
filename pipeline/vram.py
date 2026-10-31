@@ -13,7 +13,8 @@ def _query() -> tuple[int, int] | None:
     try:
         r = subprocess.run(
             ["nvidia-smi", "--query-gpu=memory.used,memory.total", "--format=csv,noheader,nounits"],
-            capture_output=True, text=True, timeout=5, creationflags=subprocess.CREATE_NO_WINDOW,
+            capture_output=True, text=True, timeout=5,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),  # Windows only; 0 elsewhere (Linux cloud GPUs)
         )
         used, total = r.stdout.splitlines()[0].split(",")
         return int(used), int(total)

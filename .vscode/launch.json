@@ -23,6 +23,69 @@
             "console": "integratedTerminal"
         },
         {
+            "name": "Phase 3 cloud: pack the Kaggle bundle (config shot)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/make_cloud_bundle.py",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Phase 3 cloud: deflicker the AnimateDiff result (config shot)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/cli.py",
+            "args": ["deflicker", "--source", "animatediff"],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Phase 3 cloud: flicker check of the AnimateDiff result",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/cli.py",
+            "args": ["flicker", "--stage", "animatediff"],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Phase 3 cloud: flicker check of the deflickered AnimateDiff result",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/cli.py",
+            "args": ["flicker", "--stage", "deflicker_animatediff"],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Phase 3 cloud: encode the AnimateDiff result to mp4",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/cli.py",
+            "args": ["encode", "--stage", "animatediff"],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Phase 3: deflicker (config shot)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/cli.py",
+            "args": ["deflicker"],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Phase 3: flicker check of the deflickered shot",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/cli.py",
+            "args": ["flicker", "--stage", "deflicker"],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal"
+        },
+        {
             "name": "Phase 2: flicker check (config shot)",
             "type": "debugpy",
             "request": "launch",

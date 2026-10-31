@@ -81,3 +81,52 @@ What it means for phase 3: there is less than 1 GB of headroom. Adding AnimateDi
 - No temporal consistency: each frame is independent apart from the shared seed.
 - No scene detection or multi-shot handling yet (the `input:` section would become a list of shots in phase 6).
 - Source frames are saved at full resolution (about 3 MB each at 1080p), so a long clip needs several GB under `work/`.
+
+## 8. Phase 3 so far: flow-warp deflicker
+
+`cli.py deflicker dance_run1` (`pipeline/temporal.py`, CPU only, about 10 s for 48 frames) blends each stylized frame with the previous output warped along the optical flow (Farneback) of the source frames; where the warp does not reproduce the source it is ignored. Same 48 frames as the baseline:
+
+| | whole-frame ratio | static change (levels) | static SSIM |
+|---|---|---|---|
+| baseline `anime` | 0.951 | 5.85 | 0.873 |
+| `deflicker` (strength 0.6, threshold 25) | 1.006 | **3.78** | 0.918 |
+
+The full blend (sigma 0, every frequency) is 35% steadier where nothing moves, but softens moving limbs, and above strength 0.7 it smears trails behind them. The default is now `temporal.lowpass_sigma: 2` with strength 0.9 (tuned, see the sweep below), which blends only coarse colors and tones so the fresh frame keeps its edges:
+
+| setting | whole-frame ratio | static change | static SSIM |
+|---|---|---|---|
+| strength 0.8, sigma 3 (default) | 0.981 | 4.34 | 0.897 |
+| strength 0.9, sigma 3 | 0.983 | 4.23 | 0.898 |
+| strength 0.9, sigma 6 | 0.968 | 4.78 | 0.886 |
+
+This removes about 26% of the flicker (the rest is edges redrawn each frame). On the highest-motion frame (10) edges and feet stay as sharp as the baseline, with a faint tint of the previous frame on one dancer's trousers. The table above (3.78) is the sigma 0 full blend. Not yet judged by eye (check `out/dance_run1_deflicker.mp4` for ghosting on moving limbs), strength is untuned, and AnimateDiff / IP-Adapter are still pending.
+
+Tuning sweep on `dance_run1` (sharpness = Laplacian variance relative to the unprocessed anime frames; 1.00 = as sharp):
+
+| strength | sigma | threshold | static change | static SSIM | sharpness |
+|---|---|---|---|---|---|
+| 0.6 | 0 (full blend) | 25 | 3.78 | 0.918 | 0.58 |
+| 0.9 | 1.5 | 25 | 3.64 | 0.912 | 0.93 |
+| 1.0 | 1.5 | 25 | 3.51 | 0.913 | 0.92 |
+| **0.9** | **2** | 25 | **3.88** | 0.906 | **0.97** |
+| 1.0 | 2 | 25 | 3.77 | 0.907 | 0.97 |
+| 0.8 | 3 | 25 | 4.34 | 0.897 | 1.00 |
+| 1.0 | 3 | 15 | 4.26 | 0.898 | 1.00 |
+
+Chosen: strength 0.9, sigma 2. A lower error threshold (15) was slightly worse everywhere. One clip, one frame inspected by eye; retune on other footage.
+
+## 9. Phase 3 result: AnimateDiff + IP-Adapter on Kaggle (T4), `dance_run1`
+
+Same 48 frames, denoise 0.4, seed 12345, IP-Adapter weight 0.5 with a frame-28 reference:
+
+| stage | whole-frame ratio | static change (levels) | static SSIM |
+|---|---|---|---|
+| per-frame baseline (`anime`) | 0.951 | 5.85 | 0.873 |
+| per-frame + local deflicker (`deflicker`) | 0.992 | 3.88 | 0.906 |
+| **AnimateDiff + IP-Adapter** (`animatediff`) | 0.985 | **4.30** | 0.900 |
+| AnimateDiff + IP-Adapter + deflicker (`deflicker_animatediff`) | 0.994 | 3.88 | 0.908 |
+
+- AnimateDiff + IP-Adapter alone removes 26% of the static flicker (5.85 to 4.30); the cheap local deflicker removes 34%.
+- The deflicker on top of AnimateDiff reaches the same 3.88 as the deflicker on the per-frame output. By this metric the two routes end up equal, so the metric alone does not justify the cloud step.
+- **What the metric misses:** the per-frame baseline recolours the dancers between frames (outfits go red, then orange, then grey) and the crowd's clothes change colour; the AnimateDiff output keeps skin tones and outfits steady across the shot, but its limbs and crowd are blockier and slightly distorted. The static-region metric is grayscale and cannot see colour drift.
+- Not yet separated: how much of the colour steadiness comes from AnimateDiff and how much from IP-Adapter (needs an AnimateDiff-only run under a new shot name).

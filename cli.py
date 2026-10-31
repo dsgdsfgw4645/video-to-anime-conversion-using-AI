@@ -12,10 +12,12 @@ from typing import Optional
 
 import typer
 
+from pipeline.animatediff import animatediff_shot
 from pipeline.batch import stylize_shot
 from pipeline.metrics import flicker_report
 from pipeline.shot_state import SettingsChanged
 from pipeline.stylize import ROOT, load_config
+from pipeline.temporal import deflicker_shot, output_stage
 from pipeline.video import encode, extract_frames
 
 app = typer.Typer(add_completion=False)
@@ -84,10 +86,78 @@ def run(
 
 
 @app.command()
+def deflicker(
+    shot: Optional[str] = typer.Argument(None, help="defaults to input.shot in the config"),
+    project: str = "default",
+    source: str = typer.Option("anime", help="which stylized stage to deflicker: anime or animatediff"),
+) -> None:
+    """Phase 3: flow-warp deflicker of a stylized shot -> deflicker[_<source>]/<shot> and out/<shot>_<that>.mp4 (CPU only)."""
+    cfg = load_config()
+    inp = cfg.get("input", {})
+    shot = shot or inp.get("shot")
+    if not shot:
+        raise typer.BadParameter("pass a shot name or set input.shot in the config.")
+    pdir = ROOT / "work" / project
+    if not (pdir / source / shot).is_dir():
+        raise typer.BadParameter(f"no stylized frames at {pdir / source / shot}; run the shot first.")
+    stage = output_stage(source)
+    try:
+        made = deflicker_shot(cfg, pdir, shot, source)
+    except SettingsChanged as e:
+        typer.echo(str(e), err=True)
+        raise typer.Exit(1)
+    typer.echo(f"deflickered {made} new frames")
+    video = ROOT / inp["video"] if inp.get("video") else None
+    out = encode(pdir / stage / shot, pdir / "out" / f"{shot}_{stage}.mp4", cfg["video"]["work_fps"],
+                 video if video and video.exists() else None, inp.get("start", 0), inp.get("seconds"))
+    typer.echo(f"wrote {out}")
+
+
+@app.command()
+def animatediff(
+    shot: Optional[str] = typer.Argument(None, help="defaults to input.shot in the config"),
+    project: str = "default",
+    seed: Optional[int] = None, denoise: Optional[float] = None,
+) -> None:
+    """Phase 3 (cloud GPU, ~16 GB): stylize the shot's extracted frames in one AnimateDiff + IP-Adapter pass -> animatediff/<shot>."""
+    cfg = load_config()
+    inp = cfg.get("input", {})
+    shot = shot or inp.get("shot")
+    if not shot:
+        raise typer.BadParameter("pass a shot name or set input.shot in the config.")
+    try:
+        made = animatediff_shot(cfg, ROOT / "work" / project, shot, seed, denoise)
+    except (SettingsChanged, FileNotFoundError) as e:
+        typer.echo(str(e), err=True)
+        raise typer.Exit(1)
+    typer.echo(f"stylized {made} frames" if made else "already done; nothing to do")
+
+
+@app.command("encode")
+def encode_stage(
+    shot: Optional[str] = typer.Argument(None, help="defaults to input.shot in the config"),
+    stage: str = typer.Option("animatediff", help="folder to encode: anime, animatediff, deflicker, deflicker_animatediff"),
+    project: str = "default",
+) -> None:
+    """Encode any stage's frames to out/<shot>_<stage>.mp4 (audio from the config's input video)."""
+    cfg = load_config()
+    inp = cfg.get("input", {})
+    shot = shot or inp.get("shot")
+    if not shot:
+        raise typer.BadParameter("pass a shot name or set input.shot in the config.")
+    pdir = ROOT / "work" / project
+    video = ROOT / inp["video"] if inp.get("video") else None
+    out = encode(pdir / stage / shot, pdir / "out" / f"{shot}_{stage}.mp4", cfg["video"]["work_fps"],
+                 video if video and video.exists() else None, inp.get("start", 0), inp.get("seconds"))
+    typer.echo(f"wrote {out}")
+
+
+@app.command()
 def flicker(
     shot: Optional[str] = typer.Argument(None, help="defaults to input.shot in the config"),
     project: str = "default",
     frames: Optional[int] = typer.Option(None, help="only use the first N frames"),
+    stage: str = typer.Option("anime", help="which output to measure: anime (baseline), animatediff, deflicker or deflicker_animatediff"),
 ) -> None:
     """Flicker of a stylized shot: whole-frame SSIM vs the source, and change in static regions (lower = steadier)."""
     inp = load_config().get("input", {})
@@ -95,7 +165,7 @@ def flicker(
     if not shot:
         raise typer.BadParameter("pass a shot name or set input.shot in the config.")
     pdir = ROOT / "work" / project
-    r = flicker_report(pdir / "frames" / shot, pdir / "anime" / shot, frames)
+    r = flicker_report(pdir / "frames" / shot, pdir / stage / shot, frames)
     typer.echo(f"whole frame:    source SSIM {r['source_ssim']:.3f}  anime SSIM {r['anime_ssim']:.3f}  ratio {r['ratio']:.3f}")
     typer.echo(f"static regions: {r['static_fraction']:.0%} of pixels; anime changes by {r['static_diff']:.2f} levels "
                f"(0 = steady), SSIM {r['static_ssim']:.3f}")

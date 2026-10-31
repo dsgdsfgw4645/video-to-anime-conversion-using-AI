@@ -33,6 +33,21 @@ sampling:
 controlnet:
   lineart_strength: 0.8
 
+animatediff:           # phase 3 cloud stage (cli.py animatediff): the whole shot in one AnimateDiff pass; needs ~16 GB GPU
+  motion_model: v3_sd15_mm.ckpt
+  context_length: 16   # frames per AnimateDiff window; windows overlap so the seams blend
+  context_overlap: 4
+  timeout_seconds: 3600
+  ip_adapter:
+    enabled: true      # false = AnimateDiff alone, to measure what IP-Adapter adds (use a new shot name)
+    weight: 0.5        # how strongly the reference's colors and look are applied
+    reference: samples/dance/ip_reference.png   # relative to the project root; frame 28 of the dance_run1 anime output
+
+temporal:              # phase 3 flow-warp deflicker (cli.py deflicker); CPU only
+  strength: 0.9        # weight of the motion-warped previous frame where the flow is trusted (0 = off)
+  lowpass_sigma: 2     # blend only colors/tones coarser than this many pixels, keeping the fresh frame's edges (0 = blend all)
+  error_threshold: 25  # source color error (0-255) above which the warp is ignored (occlusions, fast motion)
+
 video:
   work_fps: 12         # stylize "on twos"; the output is encoded at this rate
   target_megapixels: 0.4   # about 512x768; safe on a 6 GB GPU

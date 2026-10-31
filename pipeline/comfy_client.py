@@ -18,6 +18,13 @@ class ComfyClient:
         except requests.RequestException:
             return False
 
+    def missing_nodes(self, workflow: dict) -> list[str]:
+        """Node types the workflow uses that the running ComfyUI doesn't have (custom node not installed, or
+        installed after ComfyUI started: a running server never sees new nodes until it is restarted)."""
+        r = requests.get(f"{self.url}/object_info", timeout=60)
+        r.raise_for_status()
+        return sorted({n["class_type"] for n in workflow.values()} - r.json().keys())
+
     def upload_image(self, path: Path) -> str:
         """Upload to ComfyUI's input folder and return the name to use in a LoadImage node."""
         with open(path, "rb") as f:

@@ -35,6 +35,10 @@ Open **Run and Debug** (Ctrl+Shift+D), choose a configuration from the drop-down
 |---|---|---|
 | **Phase 2: convert video (config input)** | Converts the config's video slice to anime. This is the main one. | about 15 s per frame |
 | **Phase 2: short preview (config input, 4 s default)** | Same, but if `input.seconds` is empty it uses 4 seconds. | about 15 s per frame |
+| **Phase 3 cloud: pack the Kaggle bundle (config shot)** | Zips the code, config, IP-Adapter reference and the shot's frames into `work/cloud/bundle_<shot>.zip` to upload to Kaggle. See `docs/cloud-kaggle.md`. | a few seconds |
+| **Phase 3 cloud: deflicker / flicker check / encode ...** | After unzipping the notebook's result at the project root: deflicker the AnimateDiff frames, measure `animatediff` or `deflicker_animatediff`, or encode them to mp4. | seconds |
+| **Phase 3: deflicker (config shot)** | Blends each stylized frame with the motion-warped previous one (CPU only), writes `deflicker/<shot>` and `out/<shot>_deflicker.mp4`. The shot must already be stylized. | about 10 s for 48 frames |
+| **Phase 3: flicker check of the deflickered shot** | Same measurement as the Phase 2 check, on the deflickered frames. | a few seconds |
 | **Phase 2: flicker check (config shot)** | Prints how steady the frames are (whole frame, and static regions), for the shot named in the config. | a few seconds |
 | **Phase 1: single-frame smoke test** | Restyles ComfyUI's example image once. | about 40 s |
 | **Setup: download models** | Fetches the checkpoint, ControlNet and lineart weights. Skips what exists. | minutes, first time only |
@@ -55,6 +59,8 @@ Open a terminal in the project folder (PowerShell). Always use the project's Pyt
 .venv\Scripts\python.exe cli.py run             # convert the config's slice
 .venv\Scripts\python.exe cli.py preview         # short slice (4 s if input.seconds is empty)
 .venv\Scripts\python.exe cli.py flicker         # steadiness of the config's shot
+.venv\Scripts\python.exe cli.py deflicker       # phase 3: flow-warp deflicker of the config's shot
+.venv\Scripts\python.exe cli.py flicker --stage deflicker   # measure the deflickered frames
 .venv\Scripts\python.exe scripts\test_single_frame.py     # phase 1 smoke test
 .venv\Scripts\python.exe scripts\download_models.py       # fetch models
 .venv\Scripts\python.exe -m pytest tests -q               # tests
@@ -134,6 +140,8 @@ All in `config/project.example.yaml`. If you create `config/project.yaml` (copy 
 | `input.shot` | Name of this run. It names the folders and the output video. | `dance_run1` |
 | `models.checkpoint`, `models.controlnet_lineart` | Which model files to use. | Counterfeit-V3.0, lineart anime |
 | `style.positive`, `style.negative` | The prompts. | anime, cel shading, clean lineart ... |
+| `animatediff.*` | The cloud stage: motion module, window size, and `ip_adapter.enabled` / `weight` / `reference`. Used by `cli.py animatediff` (cloud GPU only; see `docs/cloud-kaggle.md`). | `v3_sd15_mm.ckpt`, 16, 4, on, 0.5 |
+| `temporal.strength`, `temporal.lowpass_sigma`, `temporal.error_threshold` | Phase 3 deflicker: weight of the warped previous frame (0.9), the blur radius in pixels below which colors are blended so edges stay crisp (2; 0 blends everything and softens), and the source color error above which the warp is ignored (25). Changing them under an existing shot stops the run; use a new shot name. | `0.9`, `2`, `25` |
 | `sampling.seed` | Same seed on every frame of a shot, to limit flicker. | `12345` |
 | `sampling.denoise` | How far the result moves from the source: lower stays closer. | `0.4` |
 | `sampling.steps`, `cfg`, `sampler`, `scheduler` | Sampler settings. | 24, 7.0, euler_ancestral, normal |
@@ -198,7 +206,7 @@ They do not test the ComfyUI graph itself. Phase 1 and a real preview do that.
 
 ## 14. Not built yet
 
-From `plan.md`: phase 3 (AnimateDiff, IP-Adapter, deflicker), phase 4 (LoRA training), phase 5 (matting, compositing, face pass), phase 6 (per-shot config list, web UI, cloud worker). Phase 2 is the baseline they are compared against, on the `dance_run1` shot: static-region change 5.85 levels (lower is steadier), whole-frame ratio 0.951 (`docs/phase2-results.md`).
+From `plan.md`: the rest of phase 3 (the AnimateDiff + IP-Adapter cloud stage runs on Kaggle (confirmed by the project owner); the flow-warp deflicker is built), phase 4 (LoRA training), phase 5 (matting, compositing, face pass), phase 6 (per-shot config list, web UI, cloud worker). Phase 2 is the baseline they are compared against, on the `dance_run1` shot: static-region change 5.85 levels (lower is steadier), whole-frame ratio 0.951 (`docs/phase2-results.md`).
 
 ## 15. Change log
 
@@ -213,3 +221,8 @@ Add a line here whenever something is added or changed that affects how the proj
 | 2026-10-31 | `cli.py` with no command runs `run`, so the IDE's Run button works. |
 | 2026-10-31 | The server starts and stops by itself (`comfyui.autostart`, `autostop`), and is not started when there is nothing to stylize. `flicker` defaults to the config's shot. VS Code run configurations and the interpreter setting added. This document added. |
 | 2026-10-31 | Flicker check now also measures static regions (where the source doesn't move) and takes `--frames N`. Every run prints its peak GPU memory (5399 of 6144 MiB measured). New baseline recorded. |
+| 2026-10-31 | Phase 3 started: `cli.py deflicker` (flow-warp deflicker, CPU only) and `flicker --stage deflicker`; `temporal:` config section; two VS Code run configs. |
+| 2026-10-31 | Deflicker blends only low-frequency colors (`temporal.lowpass_sigma`), default strength 0.8, so moving edges stay crisp. Shots deflickered earlier with the old settings need a new shot name or a deleted `deflicker/<shot>` folder. |
+| 2026-10-31 | Deflicker defaults tuned to `strength: 0.9`, `lowpass_sigma: 2` (static change 3.88 vs 5.85 baseline, 97% of the baseline sharpness). |
+| 2026-10-31 | Cloud stage added: `cli.py animatediff` (one AnimateDiff + lineart ControlNet + IP-Adapter pass, ~16 GB GPU), `scripts/make_cloud_bundle.py`, `notebooks/kaggle_animatediff.ipynb`, `download_models.py --cloud`, `animatediff:` config section, `deflicker --source`, `encode --stage`. Guide: `docs/cloud-kaggle.md`. Ran end to end locally on a small test, then confirmed working on Kaggle. |
+| 2026-10-31 | Cloud stage fixes found by running it: ComfyUI-Advanced-ControlNet nodes (stock ControlNet fails with sliding windows); `vram.py` no longer uses a Windows-only flag; `server.py` starts ComfyUI itself on Linux. |

@@ -347,3 +347,16 @@ def test_flicker_metric_ranks_noise_worse(tmp_path):
             Image.fromarray(f.astype(np.uint8)).save(d / f"frame_{i:05d}.png")
     r = flicker_report(tmp_path / "steady", tmp_path / "noisy")
     assert r["source_ssim"] == pytest.approx(1.0) and r["ratio"] < 0.8
+
+
+def test_vram_query_works_without_the_windows_only_flag(monkeypatch):
+    """On Linux (the cloud GPU) subprocess has no CREATE_NO_WINDOW; the query must still run."""
+    monkeypatch.delattr(vram.subprocess, "CREATE_NO_WINDOW", raising=False)
+    seen = {}
+
+    def fake_run(cmd, **kw):
+        seen.update(kw)
+        return type("R", (), {"stdout": "1000, 15360"})()
+
+    monkeypatch.setattr(vram.subprocess, "run", fake_run)
+    assert vram._query() == (1000, 15360) and seen["creationflags"] == 0

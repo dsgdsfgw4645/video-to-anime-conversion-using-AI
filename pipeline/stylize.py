@@ -26,6 +26,17 @@ def load_config() -> dict:
     return yaml.safe_load(cfg.read_text(encoding="utf-8"))
 
 
+def lineart_resolution(megapixels: float, size: tuple[int, int], step: int = 8) -> int:
+    """Short side of the frame after ImageScaleToTotalPixels (which rounds to `step`), for the lineart node.
+
+    The preprocessor's `resolution` sets the map's short side, so mirroring the scale step draws the
+    lineart at the frame's own size.
+    """
+    w, h = size
+    scale = math.sqrt(megapixels * 1024 * 1024 / (w * h))
+    return min(round(w * scale / step), round(h * scale / step)) * step
+
+
 def build_workflow(
     cfg: dict,
     image_name: str,
@@ -44,12 +55,8 @@ def build_workflow(
     wf["1"]["inputs"]["ckpt_name"] = cfg["models"]["checkpoint"]
     wf["2"]["inputs"]["image"] = image_name
     wf["3"]["inputs"]["megapixels"] = cfg["video"]["target_megapixels"]
-    # The preprocessor's `resolution` sizes the map's short side, so mirror node 3's
-    # scaling (ImageScaleToTotalPixels) to draw the lineart at the frame's own size.
-    w, h = size
-    step = wf["3"]["inputs"]["resolution_steps"]
-    scale = math.sqrt(wf["3"]["inputs"]["megapixels"] * 1024 * 1024 / (w * h))
-    wf["7"]["inputs"]["resolution"] = min(round(w * scale / step), round(h * scale / step)) * step
+    wf["7"]["inputs"]["resolution"] = lineart_resolution(
+        wf["3"]["inputs"]["megapixels"], size, wf["3"]["inputs"]["resolution_steps"])
     wf["4"]["inputs"]["text"] = cfg["style"]["positive"]
     wf["5"]["inputs"]["text"] = cfg["style"]["negative"]
     wf["6"]["inputs"]["control_net_name"] = cfg["models"]["controlnet_lineart"]

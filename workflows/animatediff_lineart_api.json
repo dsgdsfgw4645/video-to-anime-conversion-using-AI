@@ -1,0 +1,19 @@
+{
+  "1": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": "Counterfeit-V3.0_fix_fp16.safetensors"}},
+  "2": {"class_type": "VHS_LoadImagesPath", "inputs": {"directory": "frames", "image_load_cap": 0, "skip_first_images": 0, "select_every_nth": 1}},
+  "3": {"class_type": "ImageScaleToTotalPixels", "inputs": {"image": ["2", 0], "upscale_method": "lanczos", "megapixels": 0.4, "resolution_steps": 8}},
+  "4": {"class_type": "CLIPTextEncode", "inputs": {"text": "", "clip": ["1", 1]}},
+  "5": {"class_type": "CLIPTextEncode", "inputs": {"text": "", "clip": ["1", 1]}},
+  "6": {"class_type": "ACN_ControlNetLoaderAdvanced", "inputs": {"cnet": "control_v11p_sd15s2_lineart_anime_fp16.safetensors"}},
+  "7": {"class_type": "AnimeLineArtPreprocessor", "inputs": {"image": ["3", 0], "resolution": 512}},
+  "8": {"class_type": "ACN_AdvancedControlNetApply_v2", "inputs": {"positive": ["4", 0], "negative": ["5", 0], "control_net": ["6", 0], "image": ["7", 0], "strength": 0.8, "start_percent": 0.0, "end_percent": 1.0, "vae_optional": ["1", 2]}},
+  "9": {"class_type": "VAEEncode", "inputs": {"pixels": ["3", 0], "vae": ["1", 2]}},
+  "10": {"class_type": "KSampler", "inputs": {"model": ["18", 0], "positive": ["8", 0], "negative": ["8", 1], "latent_image": ["9", 0], "seed": 12345, "steps": 24, "cfg": 7.0, "sampler_name": "euler_ancestral", "scheduler": "normal", "denoise": 0.4}},
+  "11": {"class_type": "VAEDecode", "inputs": {"samples": ["10", 0], "vae": ["1", 2]}},
+  "12": {"class_type": "SaveImage", "inputs": {"images": ["11", 0], "filename_prefix": "animatediff"}},
+  "14": {"class_type": "LoadImage", "inputs": {"image": "ip_reference.png"}},
+  "15": {"class_type": "IPAdapterUnifiedLoader", "inputs": {"model": ["1", 0], "preset": "STANDARD (medium strength)"}},
+  "16": {"class_type": "IPAdapter", "inputs": {"model": ["15", 0], "ipadapter": ["15", 1], "image": ["14", 0], "weight": 0.5, "start_at": 0.0, "end_at": 1.0, "weight_type": "standard"}},
+  "17": {"class_type": "ADE_StandardUniformContextOptions", "inputs": {"context_length": 16, "context_stride": 1, "context_overlap": 4, "fuse_method": "pyramid"}},
+  "18": {"class_type": "ADE_AnimateDiffLoaderGen1", "inputs": {"model": ["16", 0], "model_name": "v3_sd15_mm.ckpt", "beta_schedule": "autoselect", "context_options": ["17", 0]}}
+}
