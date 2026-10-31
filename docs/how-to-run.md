@@ -164,9 +164,9 @@ Phase 2 stylizes every frame on its own, so the result flickers and the colors o
 | AnimateDiff alone | 4.34 | 0.69 | 1.47 |
 | AnimateDiff + deflicker (best) | 3.97 | 0.53 | 1.40 |
 
-The local deflicker alone removes most of the grayscale flicker; AnimateDiff is what keeps the colors steady. **IP-Adapter** (a color reference image) is optional and **off by default**: on the sample clip it did not help. The metrics don't see everything, so watch the video: AnimateDiff's limbs and crowd are blockier than the per-frame version. These numbers come from one clip.
+The local deflicker alone removes most of the grayscale flicker; AnimateDiff is what keeps the colors steady. **IP-Adapter** (a color reference image) is optional and **off by default**: on the sample clip it did not help. The metrics don't see everything, so watch the video: AnimateDiff's limbs and crowd are blockier than the per-frame version. These numbers are from the first clip; on a second, harder clip (handheld camera) the same ordering held with a bigger gap, and AnimateDiff + deflicker cut color flicker by 62% (`phase3-guide.md` section 5.6).
 
-**A different video:** set a new `input.shot` (and `video`, `start`, `seconds`) in the config, pack, upload, run, unpack as above. To try a variant without editing the config, pass overrides to the pack step, for example `scripts\make_cloud_bundle.py my_shot_ipa --set animatediff.ip_adapter.enabled=true`.
+**A different video:** set a new `input.shot` (and `video`, `start`, `seconds`) in the config, pack, upload, run, unpack as above. Or skip the config edit and pack straight from the command line: `.venv\Scripts\python.exe scripts\make_cloud_bundle.py my_shot --set input.video=samples/capetown/capetown_dance.webm --set input.start=8 --set input.seconds=4` (it extracts the frames itself, so you do not have to run phase 2 first; phase 2 is only needed if you also want the per-frame baseline to compare against). To try a variant without editing the config, pass overrides to the pack step, for example `scripts\make_cloud_bundle.py my_shot_ipa --set animatediff.ip_adapter.enabled=true`.
 
 ## 8. The whole project, end to end
 
@@ -284,7 +284,7 @@ They do not test the ComfyUI graphs themselves. Phase 1, a real preview and a Ka
 
 ## 15. Not built yet
 
-From `plan.md`: phase 3 is done (local deflicker, and the AnimateDiff cloud stage on Kaggle). Optional phase 3 work still open: IP-Adapter at weights below 0.5, and trying more clips (everything was tuned on one). RAFT optical flow was tried in the deflicker and not kept: no gain on either test clip, even in fast camera pans (`phase3-guide.md` section 5.5). Then phase 4 (LoRA training), phase 5 (matting, compositing, face pass) and phase 6 (per-shot config list, web UI, cloud worker). The numbers to compare against, on `dance_run1`, are in section 7 and `docs/phase3-guide.md`.
+From `plan.md`: phase 3 is done (local deflicker, and the AnimateDiff cloud stage on Kaggle). Optional phase 3 work still open: IP-Adapter at weights below 0.5, and trying more clips (the settings were tuned on one clip and held up on a second). RAFT optical flow was tried in the deflicker and not kept: no gain on either test clip, even in fast camera pans (`phase3-guide.md` section 5.5). Then phase 4 (LoRA training), phase 5 (matting, compositing, face pass) and phase 6 (per-shot config list, web UI, cloud worker). The numbers to compare against, on `dance_run1`, are in section 7 and `docs/phase3-guide.md`.
 
 ## 16. Change log
 

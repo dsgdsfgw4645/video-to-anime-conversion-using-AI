@@ -5,7 +5,7 @@ Phase 2 stylizes every frame on its own, so the result flickers and the colors o
 - **A. Flow-warp deflicker:** blends each stylized frame with the previous one, warped along the source video's motion. CPU only, seconds, runs on this machine.
 - **B. AnimateDiff in the cloud:** the whole shot goes through ComfyUI in one pass with a motion module that keeps neighbouring frames consistent. It needs about 16 GB of GPU memory, so it runs in a Kaggle notebook, not on the RTX 2060 (6 GB).
 
-**Short answer from the one clip tested (`dance_run1`):** the local deflicker alone removes most of the grayscale flicker; AnimateDiff is what keeps colors steady; AnimateDiff alone plus the deflicker is the best result; IP-Adapter (a color reference image) did not help and is off by default. Section 5 has the numbers.
+**Short answer from the two clips tested (`dance_run1` and `capetown_run1`):** the local deflicker alone removes most of the grayscale flicker; AnimateDiff is what keeps colors steady; AnimateDiff alone plus the deflicker is the best result; IP-Adapter (a color reference image) did not help and is off by default. Section 5 has the numbers.
 
 ## 1. How it works
 
@@ -63,6 +63,8 @@ Section 7 of `how-to-run.md` has the steps for the IDE and the command prompt, a
 .venv\Scripts\python.exe cli.py flicker --stage deflicker_animatediff
 .venv\Scripts\python.exe cli.py encode --stage animatediff                 # mp4 of any stage
 ```
+
+A new video with no config edit: `.venv\Scripts\python.exe scripts\make_cloud_bundle.py my_shot --set input.video=samples/capetown/capetown_dance.webm --set input.start=8 --set input.seconds=4`.
 
 Stage folders under `work/default/`: `anime` (phase 2), `deflicker`, `animatediff`, `deflicker_animatediff`. `cli.py flicker <shot> --stage <folder>` measures any of them.
 
@@ -160,6 +162,24 @@ RAFT's flow is clearly more accurate during fast camera moves (up to 27% lower e
 
 On both windows RAFT was 1 to 7% worse than Farneback, never better, so it was not kept. (The bar was: at least 10% better on two of the three measures, with no loss of sharpness and a visible difference; RAFT never came close.) A likely reason is that the deflicker's trust map already rejects the pixels where Farneback is wrong, so a more accurate flow trusts more pixels but not better ones. The code was removed again; nothing about RAFT remains in the repository.
 
+### 5.6 A second, harder clip (`capetown_run1`)
+
+To check that the settings tuned on clip 1 are not specific to it, the same flow was run on `samples/capetown/capetown_dance.webm` (1080p handheld footage, CC BY-SA 4.0): 4 s from second 8, 48 frames, two men swinging flags and a child moving around. Its camera moves about 3 to 5 times more than clip 1's and its people about 2 to 4 times more. Same settings as before (denoise 0.4, seed 12345, IP-Adapter off, deflicker 0.9 / 2 / 25). The AnimateDiff stage ran on Kaggle. Lower is steadier in every column.
+
+| Stage | Static change | Color flicker | Color drift |
+|---|---|---|---|
+| per-frame baseline | 5.67 | 2.47 | 3.18 |
+| per-frame + local deflicker | 3.77 | 1.18 | 2.44 |
+| AnimateDiff alone | 3.44 | 1.28 | 2.16 |
+| **AnimateDiff + deflicker (best)** | **3.02** | **0.94** | **1.91** |
+
+- **Same ordering as clip 1, with a bigger gap.** AnimateDiff + deflicker is best on all three measures: static change down 47%, color flicker down 62%, color drift down 40% from the baseline (clip 1: 32%, 72%, 46%). Here AnimateDiff alone also beats the deflicker alone on static change and drift, and the deflicker adds a clear extra gain on top of AnimateDiff, which it did not on clip 1's static change.
+- **The settings carry over.** The deflicker tuned on clip 1 removes 34% of the static flicker and 52% of the color flicker on this clip, with no visible ghosting or trails behind the swinging flags.
+- **The difference is clearly visible.** The per-frame version recolors people from frame to frame (yellow shirts turn orange and red, black shorts turn pink, pink and blue patches appear on faces) and the grass is noisy. AnimateDiff keeps the shirts yellow and grey, the shorts black and the flags in the right colors, and the grass smooth.
+- **Faces are still weak.** The people are small in the frame, and at 0.4 MP their faces come out as smudged blanks (per-frame: pink and blue patches). Neither AnimateDiff nor the deflicker fixes small faces; that needs more resolution, a face pass or an actor LoRA (phases 4 and 5).
+- **The static metric says less here.** With a moving camera, 90% of the pixels count as static, mostly low-texture grass. Rely on the color numbers and the video.
+- A second window of this clip with fast camera pans (`capetown_pan1`, 13 to 17 s) was stylized locally and used for the RAFT test (section 5.5); it was not run on Kaggle.
+
 ## 6. Verified
 
 - `pytest tests -q`: 47 pass (22 in `tests/test_phase3.py`: deflicker effect, resume, settings protection, trust map, low-pass edge test, the AnimateDiff graph with and without IP-Adapter and with the sliding-window-safe ControlNet nodes, the shot runner with a fake ComfyUI, missing-node message, color metric on synthetic shots, bundle overrides, IP-Adapter off by default).
@@ -168,7 +188,7 @@ On both windows RAFT was 1 to 7% worse than Farneback, never better, so it was n
 
 ## 7. Known issues and pending
 
-- **One clip.** Everything was tuned and measured on `dance_run1` (a mostly locked-off camera). Other footage may need other settings.
+- **Two clips.** The settings were tuned on `dance_run1` (a mostly locked-off camera) and held up on `capetown_run1` (a handheld camera, section 5.6). Other footage, especially with close-ups, may still need other settings.
 - **AnimateDiff output has blockier limbs and a distorted crowd** that the metrics do not capture. The model is SD1.5 at 0.4 MP.
 - **IP-Adapter** was only tried at weight 0.5 with two references. Lower weights, and footage where the checkpoint recolors more strongly, are untested.
 - **RAFT flow was tried and not kept** (section 5.5): no gain on either clip, including fast camera pans.
