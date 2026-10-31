@@ -2,6 +2,8 @@
 import subprocess
 from pathlib import Path
 
+from pipeline.shot_state import prepare
+
 
 def _run(cmd: list[str]) -> None:
     r = subprocess.run(cmd, capture_output=True, text=True)
@@ -18,12 +20,23 @@ def has_audio(video: Path) -> bool:
     return bool(r.stdout.strip())
 
 
+def extract_settings(video: Path, fps: float, start: float, seconds: float | None) -> dict:
+    """Everything that decides which frames extract_frames produces."""
+    st = video.stat()
+    return {"video": str(video.resolve()), "size": st.st_size, "mtime_ns": st.st_mtime_ns,
+            "fps": fps, "start": start, "seconds": seconds}
+
+
 def extract_frames(video: Path, out_dir: Path, fps: float, start: float = 0, seconds: float | None = None) -> int:
-    """Write out_dir/frame_00001.png ... at `fps`. Skips work if frames already exist (resumable)."""
+    """Write out_dir/frame_00001.png ... at `fps`.
+
+    Resumable: frames already there are reused if they were made with the same video, start, seconds
+    and fps. With different settings SettingsChanged is raised and nothing is touched.
+    """
+    prepare(out_dir, extract_settings(video, fps, start, seconds))
     existing = sorted(out_dir.glob("frame_*.png"))
     if existing:
         return len(existing)
-    out_dir.mkdir(parents=True, exist_ok=True)
     cmd = ["ffmpeg", "-y", "-v", "error", "-ss", str(start), "-i", str(video)]
     if seconds is not None:
         cmd += ["-t", str(seconds)]

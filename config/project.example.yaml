@@ -6,6 +6,10 @@ input:
   video: samples/dance/dance.webm   # relative to the project root; CLI argument overrides it
   start: 5             # seconds into the clip; --start overrides
   seconds: 4           # length to process (omit or null = to the end); --seconds overrides
+  shot: dance_run1     # name of this run's folders and output video; --shot overrides.
+                       # Same name + same settings = frames are reused. Same name + different settings =
+                       # the run stops and nothing is overwritten, so pick a new name for each experiment.
+                       # Omit it to use the video's file name (plus _preview for `preview`).
 
 models:
   checkpoint: Counterfeit-V3.0_fix_fp16.safetensors

@@ -8,6 +8,7 @@ from PIL import Image
 
 import pipeline.batch as batch
 from pipeline.metrics import flicker_report
+from pipeline.shot_state import SettingsChanged
 from pipeline.video import extract_frames, encode, has_audio
 
 
@@ -84,7 +85,14 @@ class FakeClient:
             dest.write_bytes(self._src.read_bytes())
 
 
-CFG = {"comfyui": {"url": "x"}}
+CFG = {
+    "comfyui": {"url": "x"},
+    "models": {"checkpoint": "m.safetensors", "controlnet_lineart": "c.safetensors"},
+    "style": {"positive": "anime", "negative": "photo"},
+    "sampling": {"seed": 1, "steps": 4, "cfg": 7.0, "sampler": "euler", "scheduler": "normal", "denoise": 0.4},
+    "controlnet": {"lineart_strength": 0.8},
+    "video": {"work_fps": 12, "target_megapixels": 0.4},
+}
 
 
 def test_stylize_resumes_after_crash(clip, tmp_path, monkeypatch):
@@ -98,6 +106,89 @@ def test_stylize_resumes_after_crash(clip, tmp_path, monkeypatch):
     FakeClient.calls, FakeClient.fail_on = 0, -1
     assert batch.stylize_shot(CFG, tmp_path, "s") == 7                    # only the missing ones
     assert len(list((tmp_path / "lineart" / "s").glob("*.png"))) == 12
+
+
+def _fake_comfy(monkeypatch):
+    monkeypatch.setattr(batch, "ComfyClient", FakeClient)
+    monkeypatch.setattr(batch, "build_workflow", lambda cfg, name, size, seed, denoise: {})
+    FakeClient.calls, FakeClient.fail_on = 0, -1
+
+
+def _snapshot(folder: Path) -> dict:
+    return {f.name: f.read_bytes() for f in folder.iterdir()}
+
+
+def test_extract_stops_on_changed_settings_and_touches_nothing(clip, tmp_path):
+    f = tmp_path / "f"
+    assert extract_frames(clip, f, fps=12, seconds=1) == 12
+    before = _snapshot(f)
+    assert extract_frames(clip, f, fps=12, seconds=1) == 12                # same settings: reused
+    with pytest.raises(SettingsChanged, match=r"start 0 -> 0\.5"):
+        extract_frames(clip, f, fps=12, start=0.5, seconds=1)
+    assert _snapshot(f) == before                                          # nothing deleted or rewritten
+
+
+def test_stylize_stops_on_changed_denoise_or_seed_and_touches_nothing(clip, tmp_path, monkeypatch):
+    _fake_comfy(monkeypatch)
+    extract_frames(clip, tmp_path / "frames" / "s", fps=12, seconds=1)
+    assert batch.stylize_shot(CFG, tmp_path, "s", denoise=0.4) == 12
+    before = (_snapshot(tmp_path / "anime" / "s"), _snapshot(tmp_path / "lineart" / "s"))
+    assert batch.stylize_shot(CFG, tmp_path, "s", denoise=0.4) == 0        # same settings: resume, nothing to do
+    with pytest.raises(SettingsChanged, match=r"sampling\.denoise 0\.4 -> 0\.5"):
+        batch.stylize_shot(CFG, tmp_path, "s", denoise=0.5)
+    with pytest.raises(SettingsChanged, match=r"sampling\.seed"):
+        batch.stylize_shot(CFG, tmp_path, "s", denoise=0.4, seed=99)
+    assert (_snapshot(tmp_path / "anime" / "s"), _snapshot(tmp_path / "lineart" / "s")) == before
+
+
+def test_stylize_stops_when_source_frames_differ(clip, tmp_path, monkeypatch):
+    _fake_comfy(monkeypatch)
+    extract_frames(clip, tmp_path / "frames" / "s", fps=12, seconds=1)
+    batch.stylize_shot(CFG, tmp_path, "s")
+    extract_frames(clip, tmp_path / "frames" / "t", fps=12, start=0.5, seconds=1)
+    (tmp_path / "frames" / "s" / "settings.json").write_text(
+        (tmp_path / "frames" / "t" / "settings.json").read_text(encoding="utf-8"), encoding="utf-8")
+    with pytest.raises(SettingsChanged, match=r"frames\.start"):
+        batch.stylize_shot(CFG, tmp_path, "s")
+
+
+def test_shot_without_a_settings_record_is_refused(clip, tmp_path):
+    f = tmp_path / "f"
+    extract_frames(clip, f, fps=12, seconds=1)
+    (f / "settings.json").unlink()                                          # a shot made before tracking
+    before = _snapshot(f)
+    with pytest.raises(SettingsChanged, match="before settings tracking"):
+        extract_frames(clip, f, fps=12, seconds=1)
+    assert _snapshot(f) == before
+
+
+def test_cli_stops_with_message_and_keeps_the_old_video(clip, tmp_path, monkeypatch):
+    from typer.testing import CliRunner
+    import cli
+    _fake_comfy(monkeypatch)
+    monkeypatch.setattr(cli, "ROOT", tmp_path)
+    monkeypatch.setattr(cli, "load_config", lambda: {**CFG, "input": {"shot": "mine"}})
+    runner = CliRunner()
+    first = runner.invoke(cli.app, ["run", str(clip), "--seconds", "1", "--denoise", "0.4"])
+    assert first.exit_code == 0, first.output
+    out = tmp_path / "work" / "default" / "out" / "mine.mp4"
+    before = (out.read_bytes(), _snapshot(tmp_path / "work" / "default" / "anime" / "mine"))
+    again = runner.invoke(cli.app, ["run", str(clip), "--seconds", "1", "--denoise", "0.4"])
+    assert again.exit_code == 0 and "stylized 0 new frames" in again.output
+    second = runner.invoke(cli.app, ["run", str(clip), "--seconds", "1", "--denoise", "0.5"])
+    assert second.exit_code == 1
+    assert "different settings" in second.output and "new shot name" in second.output
+    assert "wrote" not in second.output                                     # stopped before encoding
+    assert (out.read_bytes(), _snapshot(tmp_path / "work" / "default" / "anime" / "mine")) == before
+
+
+def test_shot_name_priority():
+    from cli import resolve_shot
+    v = Path("samples/clip.mp4")
+    assert resolve_shot("cli", {"shot": "cfg"}, v, "_preview") == "cli"      # --shot wins
+    assert resolve_shot(None, {"shot": "cfg"}, v, "_preview") == "cfg"       # then the config
+    assert resolve_shot(None, {}, v, "_preview") == "clip_preview"           # then the video name
+    assert resolve_shot(None, {}, v) == "clip"
 
 
 def test_flicker_metric_ranks_noise_worse(tmp_path):

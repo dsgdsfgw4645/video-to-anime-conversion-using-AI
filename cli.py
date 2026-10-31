@@ -1,4 +1,4 @@
-"""Video -> anime CLI (phase 2: ingest -> per-frame img2img -> encode).
+r"""Video -> anime CLI (phase 2: ingest -> per-frame img2img -> encode).
 
   .venv\Scripts\python.exe cli.py preview            # video/start/seconds from config `input:`
   .venv\Scripts\python.exe cli.py preview other.mp4 --start 10 --seconds 3   # CLI overrides config
@@ -12,14 +12,20 @@ import typer
 
 from pipeline.batch import stylize_shot
 from pipeline.metrics import flicker_report
+from pipeline.shot_state import SettingsChanged
 from pipeline.stylize import ROOT, load_config
 from pipeline.video import encode, extract_frames
 
 app = typer.Typer(add_completion=False)
 
 
+def resolve_shot(cli_shot: Optional[str], inp: dict, video: Path, suffix: str = "") -> str:
+    """--shot wins, then input.shot in the config, then the video's file name plus `suffix`."""
+    return cli_shot or inp.get("shot") or f"{video.stem}{suffix}"
+
+
 def _process(video: Optional[Path], project: str, shot: Optional[str], start: Optional[float],
-             seconds: Optional[float], seed: Optional[int], denoise: Optional[float]) -> None:
+             seconds: Optional[float], seed: Optional[int], denoise: Optional[float], suffix: str = "") -> None:
     cfg = load_config()
     inp = cfg.get("input", {})
     # CLI options win over the config's `input:` section.
@@ -29,11 +35,15 @@ def _process(video: Optional[Path], project: str, shot: Optional[str], start: Op
     start = start if start is not None else inp.get("start", 0)
     seconds = seconds if seconds is not None else inp.get("seconds")
     fps = cfg["video"]["work_fps"]
-    shot = shot or video.stem
+    shot = resolve_shot(shot, inp, video, suffix)
     pdir = ROOT / "work" / project
-    n = extract_frames(video, pdir / "frames" / shot, fps, start, seconds)
-    typer.echo(f"{n} frames at {fps} fps")
-    made = stylize_shot(cfg, pdir, shot, seed, denoise)
+    try:
+        n = extract_frames(video, pdir / "frames" / shot, fps, start, seconds)
+        typer.echo(f"{n} frames at {fps} fps")
+        made = stylize_shot(cfg, pdir, shot, seed, denoise)
+    except SettingsChanged as e:  # nothing was changed; stop before encoding too
+        typer.echo(str(e), err=True)
+        raise typer.Exit(1)
     typer.echo(f"stylized {made} new frames")
     out = encode(pdir / "anime" / shot, pdir / "out" / f"{shot}.mp4", fps, video, start, seconds)
     typer.echo(f"wrote {out}")
@@ -50,8 +60,7 @@ def preview(
     """Stylize a short slice of the clip."""
     if seconds is None:
         seconds = load_config().get("input", {}).get("seconds") or 4
-    name = shot or f"{(video or Path(load_config()['input']['video'])).stem}_preview"
-    _process(video, project, name, start, seconds, seed, denoise)
+    _process(video, project, shot, start, seconds, seed, denoise, suffix="_preview")
 
 
 @app.command()
