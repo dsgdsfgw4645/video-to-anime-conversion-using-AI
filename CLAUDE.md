@@ -44,4 +44,4 @@ Full from-scratch setup is in `README.md`. `docs/how-to-run.md` is the user's ru
 - **PATH in new shells:** winget installs (git, ffmpeg) aren't on PATH in the tool shell until you refresh it: `$env:Path = [Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [Environment]::GetEnvironmentVariable("Path","User")`. `start_comfyui.ps1` already does this.
 - **`OSError: WinError 1114` loading `c10.dll`** means the Visual C++ Redistributable is too old. Upgrade `Microsoft.VCRedist.2015+.x64`.
 - **Don't `pip install -r` the controlnet_aux requirements.txt wholesale.** It pulls `mediapipe`/`onnxruntime-gpu`, which can pin numpy below 2 and break the torch stack. Install only the deps the specific preprocessor needs (the current minimal set is in `README.md`).
-- `.venv/`, `third_party/` and `work/` are generated or vendored. There is no git repo in the project root yet.
+- `.venv/`, `third_party/` and `work/` are generated or vendored. The project is a git repo (branch `main`, remote `origin` on GitHub); those three folders are in `.gitignore`, as is `result_*/` (unzipped cloud results).

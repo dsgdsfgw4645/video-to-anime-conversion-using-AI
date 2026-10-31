@@ -190,7 +190,7 @@ Python 3.11, Git, FFmpeg and a newer Visual C++ Redistributable (all via winget,
 | No `config/project.yaml` | Only the example is used. Create your own copy before changing settings. |
 | Settings partly tuned | Phase 2 lowered `denoise` to 0.4. `lineart_strength 0.8` and the prompts are still first guesses. |
 | Node ids are hard-coded | Editing the workflow in ComfyUI's UI and re-exporting will renumber nodes and break the patching in `test_single_frame.py`. |
-| No git repo | Phase 2 added tests for the frame pipeline, but nothing tests the ComfyUI graph itself. |
+| Graphs not unit-tested | The tests fake ComfyUI, so nothing tests a ComfyUI graph itself; the graphs were checked by running them (phase 3's AnimateDiff graph also on Kaggle). |
 | Duplicate outputs | Each run is stored twice (`ComfyUI\output` and `work\phase1`). Harmless; clear when disk matters. |
 
 ### Out of phase 1's scope, so correctly absent
