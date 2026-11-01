@@ -2,7 +2,7 @@
 
 The local pipeline stylizes each frame on its own. This stage sends the whole shot through ComfyUI in **one pass**: AnimateDiff's motion module (16-frame windows, 4-frame overlap) keeps neighbouring frames consistent, the same lineart ControlNet keeps the structure, and optionally IP-Adapter ties the colours to a reference image (off by default: it did not help on the test clip, see `docs/phase3-guide.md` section 5). It needs about 16 GB of GPU memory, so it runs on Kaggle (or Colab, or a rented GPU), not on the 6 GB RTX 2060.
 
-**Status: working and measured.** It was first run end to end on the local RTX 2060 with a small test (20 frames at 0.12 MP), which found one real bug (the stock ControlNet nodes can't be used with AnimateDiff's sliding windows; fixed with ComfyUI-Advanced-ControlNet), and then on Kaggle at full size (`dance_run1`, 48 frames at 0.4 MP, T4). The results, including the comparison with and without IP-Adapter, are in `docs/phase3-guide.md` section 5: AnimateDiff alone plus the deflicker was the best. If a step fails, the notebook prints which node is missing or ComfyUI's own error.
+**Status: working and measured.** It was first run end to end on the local RTX 2060 with a small test (20 frames at 0.12 MP), which found one real bug (the stock ControlNet nodes can't be used with AnimateDiff's sliding windows; fixed with ComfyUI-Advanced-ControlNet), and then on Kaggle at full size (`dance_run1` and `capetown_run1`, 48 frames at 0.4 MP; the GPU type was not recorded). The results, including the comparison with and without IP-Adapter, are in `docs/phase3-guide.md` section 5: AnimateDiff alone plus the deflicker was the best. If a step fails, the notebook prints which node is missing or ComfyUI's own error.
 
 ## What each step does to the flicker
 
@@ -14,9 +14,9 @@ Each stage lands in its own folder (`animatediff/`, `deflicker_animatediff/`) so
 
 ## Steps
 
-1. **Pack** (locally, the shot's frames must exist): run **Phase 3 cloud: pack the Kaggle bundle** in VS Code, or `.venv\Scripts\python.exe scripts\make_cloud_bundle.py [shot]`. It writes `work/cloud/bundle_<shot>.zip` (about 44 MB: code, workflows, config, the IP-Adapter reference image, and the extracted frames).
+1. **Pack** (locally, the shot's frames must exist): run **Phase 3 cloud: pack the Kaggle bundle** in VS Code, or `.venv\Scripts\python.exe scripts\make_cloud_bundle.py [shot]`. It writes `work/cloud/bundle_<shot>.zip` (44 to 94 MB depending on the clip: code, workflows, config, the IP-Adapter reference image, and the extracted frames).
 2. **Upload** the zip at kaggle.com/datasets as a new dataset (private is fine). Kaggle unzips it, so the dataset ends up as the extracted folders; the notebook finds either form.
-3. **Notebook:** kaggle.com/code, New Notebook, File > Import Notebook, pick `notebooks/kaggle_animatediff.ipynb`. In the right panel: Add Input (your dataset), Accelerator **GPU T4 x2** or **P100**, Internet **On** (needs a phone-verified account). Run All. It installs ComfyUI and the custom nodes, downloads the models (`download_models.py --cloud`), checks that the nodes loaded, runs the shot, measures flicker and runs the deflicker.
+3. **Notebook:** kaggle.com/code, New Notebook, File > Import Notebook, pick `notebooks/kaggle_animatediff.ipynb`. In the right panel: Add Input (your dataset), Accelerator **GPU** (choose a T4; the P100's older architecture may not be supported by newer PyTorch builds), Internet **On** (needs a phone-verified account). Run All. It installs ComfyUI and the custom nodes, downloads the models (`download_models.py --cloud`), checks that the nodes loaded, runs the shot, measures flicker and runs the deflicker.
 4. **Download** `result_<shot>.zip` from the notebook's Output tab and unzip it **at the project root**; it contains `work/default/animatediff/<shot>`, `work/default/deflicker_animatediff/<shot>` and the two mp4s in `work/default/out/`.
 5. **Measure locally** (or read the numbers the notebook printed): the VS Code configs "Phase 3 cloud: flicker check of ..." or `cli.py flicker --stage animatediff` and `--stage deflicker_animatediff`. Watch the mp4s too: the metric cannot see ghosting or wrong colours.
 
@@ -38,6 +38,6 @@ Each stage lands in its own folder (`animatediff/`, `deflicker_animatediff/`) so
 
 - **All or nothing:** a shot is one pass, so there is no per-frame resume. If it fails, nothing is written. Settings are tracked as in phase 2: a changed setting under the same shot name stops the run; use a new shot name.
 - **Same frames, same size:** the stage reads the shot's extracted frames and scales them to `video.target_megapixels` (0.4), so the comparison with the baseline is like for like.
-- **Free-tier limits** change; check Kaggle's current GPU hours and session length. A 4 s shot (48 frames) should take well under one session.
+- **Free-tier limits** change; check Kaggle's current GPU hours and session length. Each 4 s shot (48 frames) so far completed within one session; the run time was not recorded.
 - **Untuned:** denoise 0.4 (shared with phase 2), v3 motion module, `autoselect` beta schedule; IP-Adapter, if enabled, only tried at weight 0.5 with two references.
-- **IP-Adapter placement:** the graph applies IP-Adapter to the model before the AnimateDiff loader. If the first run errors or the colours do not change, try swapping the order.
+- **IP-Adapter placement:** when enabled, the graph applies IP-Adapter to the model before the AnimateDiff loader. That order ran correctly in the tests, with both reference images.

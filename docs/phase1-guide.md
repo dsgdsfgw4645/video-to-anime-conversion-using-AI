@@ -61,17 +61,17 @@ That is why `models\clip`, `models\vae`, `models\text_encoders` and `models\unet
 
 `netG.pth` is in the script too, so a fresh or cloud machine gets it at setup. (Before that, the controlnet_aux node downloaded it from `lllyasviel/Annotators` the first time the workflow ran, and it still would as a fallback.)
 
-### Folders that exist but are empty (reserved for later phases)
+### Model folders that are empty or absent, and what became of each plan
 
-| Folder under `third_party\ComfyUI\models\` | Will hold | Phase |
+| Folder under `third_party\ComfyUI\models\` | Planned for | What happened |
 |---|---|---|
-| `loras\` | Style LoRA and one LoRA per actor | 4 |
-| `controlnet\` (more files) | Depth, OpenPose ControlNets | 3 |
-| `clip_vision\` | CLIP-Vision model that IP-Adapter needs | 3 |
-| `ipadapter\` (needs creating) | IP-Adapter weights | 3 |
-| `animatediff_models\` (created by the AnimateDiff node) | Motion module | 3 |
-| `optical_flow\`, `frame_interpolation\` | RAFT, RIFE | 3 / 5 |
-| `vae\`, `upscale_models\`, `embeddings\` | Optional extras | as needed |
+| `loras\` | Style LoRA and one LoRA per actor | empty; phase 4, not started |
+| `controlnet\` (more files) | Depth, OpenPose ControlNets | not built; phase 3 uses only the lineart ControlNet |
+| `clip_vision\` | CLIP-Vision model for IP-Adapter | empty locally; IP-Adapter is built but off by default, and its models are only downloaded on Kaggle when it is enabled |
+| `ipadapter\` | IP-Adapter weights | does not exist locally, for the same reason |
+| `animatediff_models\` | AnimateDiff motion module | does not exist locally: the AnimateDiff stage runs on Kaggle, where it is downloaded |
+| `optical_flow\`, `frame_interpolation\` | RAFT, RIFE | empty; RAFT was tried in phase 3 and not kept (the deflicker uses OpenCV), RIFE is not built |
+| `vae\`, `upscale_models\`, `embeddings\` | Optional extras | empty, as needed |
 
 ---
 
@@ -153,8 +153,8 @@ Not graph nodes: `comfyui.url` is used by the client (its port is used when the 
 
 | Path | What |
 |---|---|
-| `.venv\` (5.7 GB) | Python 3.11 environment: PyTorch 2.14+cu126 and ComfyUI's requirements |
-| `third_party\ComfyUI\` (3.0 GB) | Upstream ComfyUI. Don't edit. |
+| `.venv\` (about 5.9 GB) | Python 3.11 environment: PyTorch 2.14.1+cu126 and ComfyUI's requirements |
+| `third_party\ComfyUI\` (about 3.2 GB) | Upstream ComfyUI plus the models. Don't edit. |
 | `third_party\ComfyUI\custom_nodes\comfyui_controlnet_aux\` | Third-party node pack providing node 7 |
 
 ### Generated output
@@ -162,7 +162,7 @@ Not graph nodes: `comfyui.url` is used by the client (its port is used when the 
 | Path | Contents |
 |---|---|
 | `third_party\ComfyUI\output\` | Where ComfyUI itself saves. The counter increments every run (`anime_00001_`, `00002_`, …). |
-| `work\phase1\` | The client's copy of each run's outputs. Currently 4 files: `anime_00001_`, `anime_00002_`, `lineart_00001_`, `lineart_00002_`, so there are two runs' worth. |
+| `work\phase1\` | The client's copy of each run's outputs. Currently 9 files (5 anime images and 4 line maps) from several test runs. |
 | `third_party\ComfyUI\input\` | `example.png` (ComfyUI's mascot drawing, the test image) plus anything you upload. |
 
 ### Installed outside the project
@@ -177,7 +177,7 @@ Python 3.11, Git, FFmpeg and a newer Visual C++ Redistributable (all via winget,
 
 - Toolchain installed; PyTorch sees the RTX 2060 (6 GB) with CUDA.
 - ComfyUI cloned and runs; controlnet_aux node added with only the dependencies the anime preprocessor needs.
-- Anime checkpoint and lineart ControlNet downloaded; `netG.pth` auto-downloaded on first run.
+- Anime checkpoint and lineart ControlNet downloaded; `netG.pth` was auto-downloaded on first run, and `download_models.py` now fetches it too.
 - `ComfyClient`, the workflow, config file and scripts written.
 - **Lineart size fix:** the preprocessor's `resolution` sets the map's short side, so `test_single_frame.py` now mirrors node 3's scaling and writes the result into node 7. Verified: the map is 648×648, matching the 648×648 output (it was 512×512 before). The JSON's `512` is just a placeholder that code overwrites.
 - **One end-to-end run succeeded** in about 39 s: image in, anime image plus lineart map out. I looked at both: colors became flat cel-shaded anime, and the pose, clouds and hill were preserved.
@@ -205,7 +205,7 @@ Video ingest and encode and a CLI (built in phase 2, see `phase2-results.md`). A
 | Phase | New files and models | Touches |
 |---|---|---|
 | 2 Frame MVP (**done**) | `pipeline/video.py`, `batch.py`, `metrics.py`, `cli.py`, `tests/` | Reuses the client and workflow unchanged |
-| 3 Consistency | AnimateDiff motion module, IP-Adapter and CLIP-Vision weights, depth/OpenPose ControlNets, new workflow JSON | New folders listed in section 2; more custom nodes |
+| 3 Consistency (**done**) | `pipeline/temporal.py`, `pipeline/animatediff.py`, `workflows/animatediff_lineart_api.json`, the Kaggle notebook, the AnimateDiff motion module (cloud only) | A second graph that reuses the phase 1 nodes, with the ControlNet nodes swapped for the Advanced ones; IP-Adapter built but off by default; no depth or OpenPose ControlNets. See `phase3-guide.md` |
 | 4 Training | `training/`, kohya_ss; outputs land in `models\loras\` | Node `"1"` gets a LoraLoader after it |
 | 5 Composite | `pipeline/preprocess.py` (matting), `composite.py` | Matting models (RVM or SAM2) |
 | 6 Product | `cli.py`, FastAPI app | Wraps everything above |

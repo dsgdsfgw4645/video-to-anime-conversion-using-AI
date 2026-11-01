@@ -48,8 +48,8 @@ Open **Run and Debug** (Ctrl+Shift+D), choose a configuration from the drop-down
 
 | Configuration | What it does | Typical time |
 |---|---|---|
-| **Phase 2: convert video (config input)** | Converts the config's video slice to anime. This is the main one. | about 15 s per frame |
-| **Phase 2: short preview (config input, 4 s default)** | Same, but if `input.seconds` is empty it uses 4 seconds. | about 15 s per frame |
+| **Phase 2: convert video (config input)** | Converts the config's video slice to anime. This is the main one. | 15 to 18 s per frame |
+| **Phase 2: short preview (config input, 4 s default)** | Same, but if `input.seconds` is empty it uses 4 seconds. | 15 to 18 s per frame |
 | **Phase 3: deflicker (config shot)** | Blends each stylized frame with the motion-warped previous one (CPU only), writes `deflicker/<shot>` and `out/<shot>_deflicker.mp4`. The shot must already be stylized (phase 2). | about 10 s for 48 frames |
 | **Phase 3: flicker check of the deflickered shot** | Same measurement as the phase 2 check, on the deflickered frames. | a few seconds |
 | **Phase 3 cloud: pack the Kaggle bundle (config shot)** | Zips the code, config and the shot's frames into `work/cloud/bundle_<shot>.zip` to upload to Kaggle (extracts the frames itself if needed). | a few seconds |
@@ -126,7 +126,7 @@ The server starts and stops by itself (section 12).
 | Terminal | `.venv\Scripts\python.exe cli.py run` |
 | Input | `input.video`, `input.start`, `input.seconds` from the config (or the command line) |
 | Output | `work/default/out/<shot>.mp4`, plus frames and lineart maps (section 10) |
-| Time | about 15 s per frame, 12 frames per video second. The 4-second sample is about 12 minutes. |
+| Time | 15 to 18 s per frame, 12 frames per video second. A 4-second shot (48 frames) takes about 12 to 14 minutes. |
 
 Typical loop: edit the config (a new `shot:` name, a different `denoise:`), run, watch `out/<shot>.mp4`, run **flicker check**.
 
@@ -185,7 +185,6 @@ A full pass from nothing, all from the IDE:
 3. **Phase 1: single-frame smoke test** (optional, proves the graph and GPU work).
 4. **Phase 2: convert video (config input)**.
 5. **Phase 2: flicker check (config shot)**.
-
 6. Optional, for steadier results (section 7): **Phase 3: deflicker (config shot)**, or the Kaggle AnimateDiff route.
 
 Phases 4 to 6 (training, compositing, product) are not built yet (section 15).
@@ -240,7 +239,7 @@ A **shot** is one named run. Its frames and video are kept under that name.
 - **Same shot, different settings** (a different video, start, seconds, seed, denoise, prompts, models and so on): the run **stops with a message** and changes nothing. A shot can't be overwritten by accident, and there is no force option.
 - **To try new settings:** give the run a new shot name (`input.shot` in the config, or `--shot`). Every shot keeps its own frames and video, so you can compare them.
 - **To keep using a shot,** change the settings back to what it was made with.
-- Shots made before settings were tracked (`dance_preview`, `dance_d040`, `verify_d040`) have no record, so they are locked the same way. `dance_d040` is the phase 2 baseline video.
+- Shots made before settings were tracked (`dance_preview`, `dance_d040`, `verify_d040`, `verify_msg`) have no record, so they are locked the same way. `dance_d040` is the phase 2 baseline video.
 
 ## 12. The ComfyUI server
 
@@ -259,7 +258,7 @@ Start it by hand only to use the ComfyUI web page: run **ComfyUI server only** (
 
 They do not test the ComfyUI graphs themselves. Phase 1, a real preview and a Kaggle run do that.
 
-**Reading the output of a run:** after stylizing it prints `GPU memory: peak ... MiB of 6144 MiB used`. The pipeline peaks at about 5.4 GB, so close other programs that use the GPU. Peak memory is also why phase 3 additions may not fit.
+**Reading the output of a run:** after stylizing it prints `GPU memory: peak ... MiB of 6144 MiB used`. The pipeline peaks at about 5.4 GB, so close other programs that use the GPU. That small headroom is why the AnimateDiff stage runs in the cloud.
 
 ## 14. Troubleshooting
 
@@ -274,11 +273,11 @@ They do not test the ComfyUI graphs themselves. Phase 1, a real preview and a Ka
 | VS Code uses the wrong Python | Ctrl+Shift+P, "Python: Select Interpreter", choose `.venv\Scripts\python.exe`. |
 | The ComfyUI web page shows a "missing model" warning | Ignore it. The project runs its own workflow file, not the page's template. |
 | Out of GPU memory | Close other ComfyUI servers. Lower `video.target_megapixels`. |
-| A run takes very long | Expected: about 15 s per frame. Use a short `input.seconds` while testing. |
+| A run takes very long | Expected: 15 to 18 s per frame. Use a short `input.seconds` while testing. |
 | Kaggle: `No project found under /kaggle/input` | Add your dataset to the notebook (Add Input). Re-upload if it is empty. |
 | Kaggle: `ComfyUI does not have these nodes: ...` or `Node 'ACN_...' not found` | Run notebook step 2 again (installs the node packs), then step 4 (starts a fresh ComfyUI; a running one never sees new nodes). Use the current notebook and a freshly packed bundle. |
 | Kaggle runs old code | The notebook runs the code in your uploaded dataset. After changing code, pack a new bundle and upload it as a new dataset version. |
-| A bundle zip is only 1 KB | A failed pack can leave an empty zip. The real one is about 44 MB; delete the empty one and pack again. |
+| A bundle zip is only 1 KB | A failed pack can leave an empty zip. The real one is 44 to 94 MB, depending on the clip; delete the empty one and pack again. |
 | `cli.py animatediff` or `deflicker` says the settings changed | The default `animatediff.ip_adapter.enabled` changed to off. Shots made earlier with it on are protected; use a new shot name. |
 | Unzipped Kaggle result is not found by `cli.py flicker` | The folders must be in `work/default/`, not in `result_<shot>/work/default/`. Copy them over (do not overwrite other shots). |
 

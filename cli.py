@@ -119,7 +119,7 @@ def animatediff(
     project: str = "default",
     seed: Optional[int] = None, denoise: Optional[float] = None,
 ) -> None:
-    """Phase 3 (cloud GPU, ~16 GB): stylize the shot's extracted frames in one AnimateDiff + IP-Adapter pass -> animatediff/<shot>."""
+    """Phase 3 (cloud GPU, ~16 GB): stylize the shot's extracted frames in one AnimateDiff pass (IP-Adapter optional, off by default) -> animatediff/<shot>."""
     cfg = load_config()
     inp = cfg.get("input", {})
     shot = shot or inp.get("shot")

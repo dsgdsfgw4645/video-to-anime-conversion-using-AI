@@ -13,7 +13,7 @@ This plan rebuilds that recipe with 2026-era tools. It adds ControlNet, AnimateD
 **Starting state:** `D:\projects\video to anime conversion using AI` is empty and not a git repo.
 
 **Hardware:** an RTX 2060 with 6 GB of VRAM. You skipped my questions, so I picked these defaults (easy to change):
-- **Hybrid compute:** previews and SD1.5 work run locally. LoRA training and final renders run on a rented 24 GB GPU (RunPod or Vast.ai, about $0.3–0.7/hr).
+- **Hybrid compute:** previews and SD1.5 work run locally. LoRA training and final renders run on a rented 24 GB GPU (RunPod or Vast.ai, about $0.3–0.7/hr). *(As built, phase 3 used Kaggle's free GPU, about 16 GB, instead.)*
 - **Product:** a Python CLI that drives ComfyUI through its API. An optional FastAPI + web UI comes in the last phase.
 
 ---
@@ -114,13 +114,27 @@ Python 3.11, ffmpeg, PySceneDetect, OpenCV, PyTorch, ComfyUI, and these ComfyUI 
 5. **Composite and polish:** matting, separate background, face pass, anime VFX, audio.
 6. **Productize:** project.yaml per-shot overrides, resumable jobs, FastAPI web UI, cloud worker (RunPod serverless running the same ComfyUI image).
 
+## As built so far (phases 1 to 3)
+The names in this plan are the planned ones. What exists:
+
+| In the plan | What exists |
+|---|---|
+| `pipeline/ingest.py`, `pipeline/encode.py` | `pipeline/video.py` (ffmpeg extract and encode) and `pipeline/batch.py` (the per-frame loop) |
+| `pipeline/preprocess.py` (matting, faces) | not built (phase 5) |
+| `pipeline/conditioning.py` | only the lineart ControlNet, inside the ComfyUI graph; no depth, OpenPose or RAFT maps |
+| `workflows/stylize_animatediff.json` | `workflows/img2img_lineart_api.json` (phases 1 and 2) and `workflows/animatediff_lineart_api.json` (phase 3) |
+| `pipeline/temporal.py` | exists: the OpenCV Farneback deflicker; `pipeline/animatediff.py` runs the AnimateDiff pass |
+| `pipeline/composite.py` | not built (phase 5) |
+| `cli.py anime run\|preview\|train\|shots` | `cli.py run`, `preview`, `flicker`, `deflicker`, `animatediff`, `encode`; no `train` or `shots` yet |
+| `training/` | not started (phase 4) |
+
 ## Shooting tips (for best results, as Corridor did)
 - Use flat, even lighting and a greenscreen or simple background.
 - Use exaggerated, anime-like acting and costumes with strong silhouettes.
 - Keep a locked-off or slow camera. Shoot 24 fps and stylize at 12.
 
 ## Verification
-- `python cli.py preview sample.mp4 --frames 0-48` should produce a 4-second stylized clip locally within the 6 GB limit (512 px, SD1.5).
-- A flicker metric script measures mean frame-to-frame SSIM / LPIPS on static regions. Stages 3–5 must improve on the stage 2 baseline.
-- Unit tests in `tests/` run each stage on a 2-second clip, checking frame counts, alpha masks and that audio sync is preserved.
+- `cli.py preview` (or `run`) produces a 4-second stylized clip locally within the 6 GB limit (about 0.4 MP, SD1.5). *(As built; the plan's `--frames 0-48` option does not exist.)*
+- `cli.py flicker` measures frame-to-frame SSIM, the change in static regions and the steadiness of color. Stages 3–5 must improve on the stage 2 baseline. *(LPIPS is not used.)*
+- Unit tests in `tests/` run each stage on a 2-second clip, checking frame counts, resuming and that audio is preserved. *(Alpha masks arrive with phase 5.)*
 - A full run on a 10–20 second test shot on cloud GPU gets a visual review against the reference style.

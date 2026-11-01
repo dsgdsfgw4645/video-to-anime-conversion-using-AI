@@ -18,14 +18,14 @@ The shot name comes from `--shot`, else `input.shot` in the config, else the vid
 
 | File | Purpose |
 |---|---|
-| `cli.py` | Typer commands `preview`, `run`, `flicker`; no command means `run` |
+| `cli.py` | Typer commands `preview`, `run`, `flicker`; no command means `run` (phase 3 added `deflicker`, `animatediff` and `encode`) |
 | `pipeline/server.py` | `comfy_server`: starts ComfyUI if it isn't running and stops it afterwards |
 | `pipeline/video.py` | `extract_frames`, `encode`, `has_audio` (ffmpeg/ffprobe wrappers) |
 | `pipeline/batch.py` | `stylize_shot`: the resumable loop over `ComfyClient` |
 | `pipeline/shot_state.py` | `prepare`, `SettingsChanged`: records each shot's settings and refuses to reuse a shot made with different ones |
-| `pipeline/metrics.py` | `mean_consecutive_ssim`, `static_region_flicker`, `flicker_report` |
+| `pipeline/metrics.py` | `mean_consecutive_ssim`, `static_region_flicker`, `flicker_report` (phase 3 added `color_consistency`) |
 | `pipeline/vram.py` | `VramMonitor`: peak GPU memory of a run, printed after stylizing |
-| `tests/test_phase2.py` | 19 tests; ComfyUI is faked, ffmpeg is real |
+| `tests/test_phase2.py` | 25 tests; ComfyUI is faked, ffmpeg is real |
 | `config/project.example.yaml` | new `input:` section; `denoise` now 0.4 |
 | `samples/dance/dance.webm` | test clip, 51 s, 1080p. CC BY 3.0, ThierryTuyishimeTV, Wikimedia Commons |
 
@@ -39,13 +39,13 @@ The shot name comes from `--shot`, else `input.shot` in the config, else the vid
 
 ## 4. Verified
 
-- `pytest tests -q`: 24 pass (extraction count and resume, slicing, audio and duration, odd frame sizes, resume after a mid-shot crash, flicker metric, and settings tracking: stop on changed start, denoise or seed leaving every file untouched, different source frames, shots with no record, the CLI exiting with a message and keeping the old video, running with no command, the server start and stop logic, skipping the server when nothing is left to do, the static-region flicker metric and the VRAM monitor).
+- `pytest tests/test_phase2.py -q`: 25 pass (extraction count and resume, slicing, audio and duration, odd frame sizes, resume after a mid-shot crash, flicker metric, and settings tracking: stop on changed start, denoise or seed leaving every file untouched, different source frames, shots with no record, the CLI exiting with a message and keeping the old video, running with no command, the server start and stop logic, skipping the server when nothing is left to do, the static-region flicker metric and the VRAM monitor).
 - Real run on the dance clip (5 s start, 4 s long, denoise 0.4): 48 frames, about 15 s per frame (about 12 min) on the RTX 2060, output has 48 video frames plus audio.
 - A 1 s slice at denoise 0.55 also ran, and drifted much more in colors and outfits than 0.4.
 
 ## 5. Baseline for phase 3
 
-`cli.py flicker <shot>` (add `--frames N` to use only the first N frames) measures two things on a 256x256 grayscale copy of each frame:
+`cli.py flicker <shot>` (add `--frames N` to use only the first N frames) measures two things on a 256x256 grayscale copy of each frame (phase 3 added a third, color steadiness; see `phase3-guide.md`):
 
 - **Whole frame:** mean SSIM between consecutive frames, stylized vs source. The source's value is the natural motion; a ratio well below 1 means the stylized shot changes more than it should.
 - **Static regions:** only pixels where the source itself doesn't change between two frames (after a small blur, under 6 of 255 levels). The stylized frame changing there is pure flicker, because nothing moved. `static_diff` is the mean change in levels (0 = perfectly steady); lower is better. This is the number phase 3 has to improve on, because real motion doesn't count against it.
@@ -80,7 +80,7 @@ What it means for phase 3: there is less than 1 GB of headroom. Adding AnimateDi
 - Small figures in wide shots lose faces and detail at 0.4 MP.
 - No temporal consistency in this per-frame stage: each frame is independent apart from the shared seed. Phase 3 adds it (`phase3-guide.md`).
 - No scene detection or multi-shot handling yet (the `input:` section would become a list of shots in phase 6).
-- Source frames are saved at full resolution (about 3 MB each at 1080p), so a long clip needs several GB under `work/`.
+- Source frames are saved at full resolution (about 1 to 2 MB each at 1080p), so a long clip needs several GB under `work/`.
 
 ## 8. Phase 3
 

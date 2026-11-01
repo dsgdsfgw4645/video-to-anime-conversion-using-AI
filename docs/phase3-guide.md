@@ -77,9 +77,9 @@ Same rules as phase 2 (`phase2-results.md` section 3), with one difference:
 - **The default of `animatediff.ip_adapter.enabled` changed** (on, then off), so a shot made with it on is protected the same way: use a new shot name to repeat it.
 - Variants: `make_cloud_bundle.py <new_shot> --set KEY=VALUE` changes a setting inside the zip only, so no config edit is needed. The frames of a variant are extracted again from the same video slice and are byte-identical to the original's.
 
-## 5. Results (`dance_run1`: 48 frames, start 5 s, denoise 0.4, seed 12345)
+## 5. Results
 
-Lower is steadier in every column. "Static change" is the grayscale metric from phase 2 (mean change, in 0 to 255 levels, where the source does not move). "Color flicker" and "color drift" are described below.
+Sections 5.1 to 5.4 use clip 1, `dance_run1` (48 frames, start 5 s, denoise 0.4, seed 12345); section 5.6 uses clip 2, `capetown_run1`. Lower is steadier in every column. "Static change" is the grayscale metric from phase 2 (mean change, in 0 to 255 levels, where the source does not move). "Color flicker" and "color drift" are described below.
 
 ### 5.1 The stages compared
 
@@ -183,7 +183,7 @@ To check that the settings tuned on clip 1 are not specific to it, the same flow
 ## 6. Verified
 
 - `pytest tests -q`: 47 pass (22 in `tests/test_phase3.py`: deflicker effect, resume, settings protection, trust map, low-pass edge test, the AnimateDiff graph with and without IP-Adapter and with the sliding-window-safe ControlNet nodes, the shot runner with a fake ComfyUI, missing-node message, color metric on synthetic shots, bundle overrides, IP-Adapter off by default).
-- The AnimateDiff graph was **run for real** on the local RTX 2060 (20 frames at 0.12 MP, 6 steps, 45 to 57 s, peak GPU memory 5221 MiB), with and without IP-Adapter, through `animatediff_shot()`; this found the ControlNet bug below. Then it ran on Kaggle at full size (48 frames, 0.4 MP) for all three runs in section 5.
+- The AnimateDiff graph was **run for real** on the local RTX 2060 (20 frames at 0.12 MP, 6 steps, 45 to 57 s, peak GPU memory 5221 MiB), with and without IP-Adapter, through `animatediff_shot()`; this found the ControlNet bug below. Then it ran on Kaggle at full size (48 frames, 0.4 MP) for the four runs in sections 5.1 and 5.6.
 - **Bugs found by running it:** the stock ControlNet nodes fail with AnimateDiff's sliding windows ("Control type ControlNet may not support required features for sliding context window"), fixed with ComfyUI-Advanced-ControlNet; a Windows-only subprocess flag in `vram.py` and a PowerShell-only server start crashed on Linux; Kaggle unzips uploaded datasets, so the notebook looks for the extracted project as well as a zip; a ComfyUI that was running before a custom node was installed never sees that node, so `animatediff_shot` now checks the nodes first and the notebook starts a fresh server.
 
 ## 7. Known issues and pending

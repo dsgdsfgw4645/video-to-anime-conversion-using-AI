@@ -1,8 +1,8 @@
-"""Phase 3: stylize a whole shot in ONE ComfyUI pass with AnimateDiff, the lineart ControlNet and IP-Adapter.
+"""Phase 3: stylize a whole shot in ONE ComfyUI pass with AnimateDiff and the lineart ControlNet (IP-Adapter optional, off by default).
 
 Unlike pipeline/batch.py (one independent image per frame), the frames go through the sampler as one
 batch; AnimateDiff's motion module, run over overlapping 16-frame windows, makes neighbouring frames agree,
-and IP-Adapter ties the colors to a reference image. Needs far more than 6 GB at once, so it is meant for a
+and, if enabled, IP-Adapter ties the colors to a reference image. Needs far more than 6 GB at once, so it is meant for a
 cloud GPU (see docs/cloud-kaggle.md). The ComfyUI it talks to needs AnimateDiff-Evolved,
 ComfyUI_IPAdapter_plus, ComfyUI-VideoHelperSuite and ComfyUI-Advanced-ControlNet (the stock ControlNet nodes
 fail with AnimateDiff's sliding windows), plus the models `scripts/download_models.py --cloud` fetches.
