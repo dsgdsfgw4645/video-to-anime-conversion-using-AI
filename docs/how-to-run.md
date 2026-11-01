@@ -50,7 +50,7 @@ Open **Run and Debug** (Ctrl+Shift+D), choose a configuration from the drop-down
 |---|---|---|
 | **Phase 2: convert video (config input)** | Converts the config's video slice to anime. This is the main one. | 15 to 18 s per frame |
 | **Phase 2: short preview (config input, 4 s default)** | Same, but if `input.seconds` is empty it uses 4 seconds. | 15 to 18 s per frame |
-| **Phase 3: deflicker (config shot)** | Blends each stylized frame with the motion-warped previous one (CPU only), writes `deflicker/<shot>` and `out/<shot>_deflicker.mp4`. The shot must already be stylized (phase 2). | about 10 s for 48 frames |
+| **Phase 3: deflicker (config shot)** | Blends each stylized frame with the motion-warped previous one (CPU only), writes `deflicker/<shot>` and `out/<shot>_deflicker.mp4`. The shot must already be stylized (phase 2). | about 11 s for 48 frames |
 | **Phase 3: flicker check of the deflickered shot** | Same measurement as the phase 2 check, on the deflickered frames. | a few seconds |
 | **Phase 3 cloud: pack the Kaggle bundle (config shot)** | Zips the code, config and the shot's frames into `work/cloud/bundle_<shot>.zip` to upload to Kaggle (extracts the frames itself if needed). | a few seconds |
 | **Phase 3 cloud: deflicker the AnimateDiff result (config shot)** | After unpacking the Kaggle result into `work/default/`: deflickers `animatediff/<shot>`. | seconds |
@@ -246,7 +246,7 @@ A **shot** is one named run. Its frames and video are kept under that name.
 You don't have to start it. Every run that needs it calls the same check:
 
 - A server already answers: it is used and left alone, including one you started yourself.
-- Nothing answers and `comfyui.autostart` is `true`: the project starts `scripts/start_comfyui.ps1` in the background, waits for it (about 20 seconds), runs, and then stops it (`comfyui.autostop`). Its log is `work/comfyui.log`.
+- Nothing answers and `comfyui.autostart` is `true`: the project starts `scripts/start_comfyui.ps1` in the background, waits for it (about 35 seconds on this machine), runs, and then stops it (`comfyui.autostop`). Its log is `work/comfyui.log`.
 
 On Linux (the Kaggle notebook) the same check starts `python main.py` instead of the PowerShell script.
 

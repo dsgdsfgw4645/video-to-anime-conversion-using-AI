@@ -1,9 +1,13 @@
-r"""Video -> anime CLI (phase 2: ingest -> per-frame img2img -> encode).
+r"""Video -> anime CLI (phase 2: ingest -> per-frame img2img -> encode; phase 3: deflicker and the cloud AnimateDiff stage).
 
   .venv\Scripts\python.exe cli.py preview            # video/start/seconds from config `input:`
   .venv\Scripts\python.exe cli.py preview other.mp4 --start 10 --seconds 3   # CLI overrides config
   .venv\Scripts\python.exe cli.py run                # config's slice; set seconds: null for the whole clip
   .venv\Scripts\python.exe cli.py                  # no command = run, so an IDE's run button works
+  .venv\Scripts\python.exe cli.py flicker <shot> [--stage anime|deflicker|animatediff|deflicker_animatediff]   # steadiness scores
+  .venv\Scripts\python.exe cli.py deflicker [shot] [--source animatediff]    # phase 3: local flow-warp deflicker (CPU)
+  .venv\Scripts\python.exe cli.py animatediff [shot]   # phase 3: needs a ~16 GB GPU; the Kaggle notebook runs it
+  .venv\Scripts\python.exe cli.py encode [shot] --stage <folder>              # any stage's frames -> mp4
 ComfyUI is started automatically if it isn't running (and stopped afterwards if cli.py started it).
 Re-running the same command resumes: finished frames are skipped.
 """

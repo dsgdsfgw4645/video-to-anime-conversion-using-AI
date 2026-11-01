@@ -51,4 +51,4 @@ temporal:              # phase 3 flow-warp deflicker (cli.py deflicker); CPU onl
 
 video:
   work_fps: 12         # stylize "on twos"; the output is encoded at this rate
-  target_megapixels: 0.4   # about 512x768; safe on a 6 GB GPU
+  target_megapixels: 0.4   # about 864x488 for a 16:9 clip; safe on a 6 GB GPU

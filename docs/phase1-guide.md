@@ -124,7 +124,7 @@ Execution follows the data dependencies, not the numeric order.
 | `--denoise`, `--seed` on the command line (`test_single_frame.py` or `cli.py`) | `"10"` | override the two above |
 | the image argument | `"2"` | `image` (via `upload_image`) |
 
-Not graph nodes: `comfyui.url` is used by the client (its port is used when the server is auto-started), `comfyui.autostart` and `comfyui.autostop` are used by `pipeline/server.py`, and `video.work_fps` and `input.*` are used by `cli.py` (phase 2). `style.style_lora` is still a placeholder for phase 4.
+Not graph nodes: `comfyui.url` is used by the client (its port is used when the server is auto-started), `comfyui.autostart` and `comfyui.autostop` are used by `pipeline/server.py`, and `video.work_fps` and `input.*` are used by `cli.py` (phase 2). `style.style_lora` is only a commented-out placeholder in the config, for phase 4.
 
 ---
 

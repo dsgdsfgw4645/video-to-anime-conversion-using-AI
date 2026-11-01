@@ -1,4 +1,4 @@
-"""Download the phase-1 models into the local ComfyUI models folder.
+"""Download the models into the local ComfyUI models folder (phase 1: checkpoint, ControlNet, lineart weights).
 
 Run with the project venv:  .venv\\Scripts\\python.exe scripts\\download_models.py [--cloud]
 --cloud also fetches the AnimateDiff motion module and the IP-Adapter files (for the cloud GPU).

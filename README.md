@@ -53,7 +53,7 @@ scripts\start_comfyui.ps1                                   # optional: cli.py s
 Everything goes under `work/<project>/` (default project `default`): `frames/<shot>` (source frames at 12 fps),
 `anime/<shot>` (stylized), `lineart/<shot>` (debug control maps) and `out/<shot>.mp4` (encoded, with the source audio).
 Re-running a command resumes: frames already stylized are skipped, but only if they were made with the same settings (video, `--start`, `--seconds`, `--seed`, `--denoise`, prompts, models). If the settings changed, the run stops with a message and changes nothing, so a shot can't be overwritten by accident. Set a new shot name (`input.shot` in the config, or `--shot`) to try new settings.
-Expect about 15 s per frame on the RTX 2060 (12 frames per second of video). A sample clip (CC BY 3.0, ThierryTuyishimeTV,
+Expect 15 to 18 s per frame on the RTX 2060 (12 frames per second of video). A sample clip (CC BY 3.0, ThierryTuyishimeTV,
 [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Beautiful_Traditional_South_African_Dance!.webm)) is in `samples/dance/`.
 A second, harder clip (handheld camera, several people; CC BY-SA 4.0, 23Faerie, [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Cape_Town_Palestine_Soccer_Match_Dance.webm)) is in `samples/capetown/`; the test uses 4 s from second 8: `cli.py run samples/capetown/capetown_dance.webm --start 8 --seconds 4 --shot capetown_run1`.
 Results and the flicker baseline are in [docs/phase2-results.md](docs/phase2-results.md).
