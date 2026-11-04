@@ -8,7 +8,8 @@ an AnimateDiff-only run under a new shot name:
     scripts\make_cloud_bundle.py dance_run1_noip --set animatediff.ip_adapter.enabled=false
 The zip carries the effective config (your config/project.yaml or the example, plus the shot and --set values)
 as config/project.yaml. Output: work/cloud/bundle_<shot>.zip with the code, workflows, config, the IP-Adapter
-reference and work/<project>/frames/<shot>/. No models are included; the notebook downloads them.
+reference, work/<project>/frames/<shot>/ and the LoRA files named in style.loras (stored under loras/; the notebook
+copies them into ComfyUI's models/loras). The base models are not included; the notebook downloads them.
 """
 import argparse
 import sys
@@ -18,7 +19,7 @@ from pathlib import Path
 import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from pipeline.stylize import ROOT, load_config  # noqa: E402
+from pipeline.stylize import LORA_DIR, ROOT, load_config  # noqa: E402
 from pipeline.video import extract_frames  # noqa: E402
 
 CODE = ["cli.py", "pipeline", "workflows", "scripts/download_models.py"]
@@ -54,8 +55,16 @@ def ensure_frames(cfg: dict, frames: Path) -> None:
     print(f"extracted {n} frames from {video.name}")
 
 
-def bundle(cfg: dict, shot: str, project: str) -> tuple[list[Path], str]:
-    """The files for the zip, and the config text to store in it as config/project.yaml."""
+def find_lora(name: str) -> Path:
+    """A LoRA file by name: ComfyUI's models/loras first, else training/output/<run>/."""
+    for found in [LORA_DIR / name, *sorted((ROOT / "training" / "output").glob(f"*/{name}"))]:
+        if found.is_file():
+            return found
+    raise SystemExit(f"LoRA {name} (style.loras in the config) is in neither {LORA_DIR} nor training/output/<run>/. Train it or fix the name.")
+
+
+def bundle(cfg: dict, shot: str, project: str) -> tuple[list[tuple[Path, str]], str]:
+    """(file, name inside the zip) pairs, and the config text to store in it as config/project.yaml."""
     files: list[Path] = []
     for item in CODE:
         p = ROOT / item
@@ -68,7 +77,9 @@ def bundle(cfg: dict, shot: str, project: str) -> tuple[list[Path], str]:
         files.append(reference)
     frames = ROOT / "work" / project / "frames" / shot
     ensure_frames(cfg, frames)
-    return files + sorted(frames.glob("*")), yaml.safe_dump(cfg, sort_keys=False)
+    pairs = [(f, f.relative_to(ROOT).as_posix()) for f in files + sorted(frames.glob("*"))]
+    pairs += [(find_lora(l["name"]), f"loras/{l['name']}") for l in cfg["style"].get("loras") or []]
+    return pairs, yaml.safe_dump(cfg, sort_keys=False)
 
 
 def main() -> None:
@@ -87,10 +98,12 @@ def main() -> None:
     out = ROOT / "work" / "cloud" / f"bundle_{shot}.zip"
     out.parent.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(out, "w", zipfile.ZIP_STORED) as z:   # PNGs are already compressed
-        for f in files:
-            z.write(f, f.relative_to(ROOT).as_posix())
+        for f, arcname in files:
+            z.write(f, arcname)
         z.writestr("config/project.yaml", config_text)
     print(f"wrote {out} ({out.stat().st_size / 1e6:.0f} MB)")
+    for lora in cfg["style"].get("loras") or []:
+        print(f"  LoRA included: {lora['name']} (weight {lora['weight']})")
 
 
 if __name__ == "__main__":

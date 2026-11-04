@@ -90,6 +90,7 @@ def _refs_resolve(wf: dict) -> bool:
 
 def test_animatediff_graph_with_ip_adapter(tmp_path):
     cfg = copy.deepcopy(load_config())
+    cfg["style"]["loras"] = []
     cfg["animatediff"]["ip_adapter"]["enabled"] = True
     wf = ad.build_workflow(cfg, tmp_path, "ref.png", (1080, 1920))
     assert _refs_resolve(wf)
@@ -101,10 +102,41 @@ def test_animatediff_graph_with_ip_adapter(tmp_path):
 
 def test_animatediff_graph_without_ip_adapter(tmp_path):
     cfg = copy.deepcopy(load_config())
+    cfg["style"]["loras"] = []
     cfg["animatediff"]["ip_adapter"]["enabled"] = False
     wf = ad.build_workflow(cfg, tmp_path, None, (1080, 1920))
     assert _refs_resolve(wf) and not set(ad.IP_NODES) & set(wf)
     assert wf["18"]["inputs"]["model"] == ["1", 0]
+
+
+LORAS = [{"name": "style.safetensors", "weight": 0.6, "trigger": "trig", "negative": "scar"}]
+
+
+@pytest.mark.parametrize("ip", [False, True])
+def test_animatediff_graph_with_loras(tmp_path, ip):
+    cfg = copy.deepcopy(load_config())
+    cfg["animatediff"]["ip_adapter"]["enabled"] = ip
+    cfg["style"]["loras"] = LORAS
+    wf = ad.build_workflow(cfg, tmp_path, "ref.png" if ip else None, (1080, 1920))
+    assert _refs_resolve(wf)
+    assert wf["20"]["class_type"] == "LoraLoader" and wf["20"]["inputs"]["lora_name"] == "style.safetensors"
+    assert wf["20"]["inputs"]["strength_model"] == 0.6 and wf["20"]["inputs"]["model"] == ["1", 0]
+    assert wf["4"]["inputs"]["clip"] == ["20", 1] and wf["5"]["inputs"]["clip"] == ["20", 1]
+    assert wf["4"]["inputs"]["text"].startswith("trig, ") and wf["5"]["inputs"]["text"].endswith(", scar")
+    assert wf[("15" if ip else "18")]["inputs"]["model"] == ["20", 0]
+    assert wf["10"]["inputs"]["model"] == ["18", 0]          # the sampler still reads AnimateDiff's output
+
+
+def test_animatediff_graph_without_loras_is_unchanged(tmp_path):
+    cfg = copy.deepcopy(load_config())
+    cfg["style"]["loras"] = []
+    wf = ad.build_workflow(cfg, tmp_path, None, (1080, 1920))
+    assert "20" not in wf and wf["4"]["inputs"]["text"] == cfg["style"]["positive"]
+
+
+@pytest.fixture(autouse=True)
+def _no_lora_copy(monkeypatch):
+    monkeypatch.setattr(ad, "install_loras", lambda cfg: None)   # the shot tests must not depend on the user's LoRA files
 
 
 class FakeAD:
@@ -251,3 +283,23 @@ def test_ip_adapter_is_off_by_default_and_its_models_are_only_fetched_when_on():
     assert load_config()["animatediff"]["ip_adapter"]["enabled"] is False
     assert [f[3] for f in dm.cloud_files(False)] == ["v3_sd15_mm.ckpt"]
     assert "ip-adapter_sd15.safetensors" in [f[3] for f in dm.cloud_files(True)]
+
+
+def test_bundle_carries_the_loras_under_loras(tmp_path, monkeypatch):
+    m = _bundle_module()
+    lora = tmp_path / "style.safetensors"
+    lora.write_bytes(b"x")
+    monkeypatch.setattr(m, "LORA_DIR", tmp_path)
+    cfg = copy.deepcopy(load_config())
+    cfg["style"]["loras"] = LORAS
+    monkeypatch.setattr(m, "ensure_frames", lambda cfg, frames: None)
+    pairs, text = m.bundle(cfg, "no_such_shot", "default")
+    assert (lora, "loras/style.safetensors") in pairs
+    assert "style.safetensors" in text                      # the config in the zip names it
+
+
+def test_bundle_stops_when_a_lora_file_is_missing(tmp_path, monkeypatch):
+    m = _bundle_module()
+    monkeypatch.setattr(m, "LORA_DIR", tmp_path)
+    with pytest.raises(SystemExit):
+        m.find_lora("not_trained_yet.safetensors")

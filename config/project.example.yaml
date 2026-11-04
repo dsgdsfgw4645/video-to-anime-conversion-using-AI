@@ -20,7 +20,10 @@ models:
 style:
   positive: "masterpiece, best quality, anime style, cel shading, clean lineart, vibrant colors"
   negative: "lowres, bad anatomy, bad hands, blurry, worst quality, jpeg artifacts, watermark, realistic, photo"
-  # style_lora: my_style.safetensors   # phase 4
+  loras: []            # phase 4: LoRAs from training/output/, applied in this order. Empty = plain checkpoint. Example:
+  #   - {name: bloodlust_style.safetensors, weight: 0.5, trigger: bloodlust_style}
+  #   - {name: adwait_person-000004.safetensors, weight: 0.7, trigger: adwait_person, negative: "beanie, headband, hat"}
+  #   Files are copied into ComfyUI's models/loras automatically. Changing this list counts as a changed setting (use a new shot name).
 
 sampling:
   seed: 12345          # fixed per shot; the same seed on every frame limits flicker
@@ -52,3 +55,24 @@ temporal:              # phase 3 flow-warp deflicker (cli.py deflicker); CPU onl
 video:
   work_fps: 12         # stylize "on twos"; the output is encoded at this rate
   target_megapixels: 0.4   # about 864x488 for a 16:9 clip; safe on a 6 GB GPU
+
+training:              # phase 4 (LoRA training); see training/README.md
+  style:
+    # video: training/input/bloodlust.mkv   # the film; omit to use the largest video file in training/input/
+    max_images: 250      # frames kept (spread evenly over the film)
+    crop_bottom_pct: 0   # raise (e.g. 12) if the film has burned-in subtitles
+    trigger: bloodlust_style   # first word of every caption; put it in the prompt to use the LoRA
+    steps: 2500          # total training steps (about 33 min on the RTX 2060)
+    # run: v2            # set a new name to train again with other settings (the old LoRA is never overwritten)
+  actors:
+    crops: true          # also cut face and upper-body crops from each photo (nothing is replaced)
+    # Adwait:            # per actor, by folder name in training/data/actors/
+    #   trigger: adwait_person
+    #   steps: 2400
+    #   run: v2
+  lora:                  # training/train.py; tuned for 6 GB (512 px, batch 1, AdamW8bit, gradient checkpointing)
+    network_dim: 32
+    network_alpha: 16
+    learning_rate: 0.0001
+    text_encoder_lr: 0.00005
+    epochs: 10

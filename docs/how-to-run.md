@@ -28,7 +28,7 @@ That is the whole project: it reads the video and settings from `config/project.
 | `result_*/` | about 40 MB each | The folders you get when you unzip the Kaggle results. Copy their contents into `work/default/` (section 7). |
 | `__pycache__/`, `.pytest_cache/` | small | Python and test caches, created automatically. |
 
-`config/project.yaml` (your own settings) is not created for you and is not ignored. The code reads it first and falls back to `config/project.example.yaml`.
+`config/project.yaml` (your own settings) is in the project and is not ignored. The code reads it first and falls back to `config/project.example.yaml`. It holds the selfie setting "A" (see section 9); the example keeps the original defaults.
 
 **Setting up on a new computer (or after deleting `.venv` or `third_party`):**
 
@@ -191,7 +191,7 @@ Phases 4 to 6 (training, compositing, product) are not built yet (section 15).
 
 ## 9. Settings you change
 
-All in `config/project.example.yaml`. If you create `config/project.yaml` (copy the example), that file is used instead and the example stays as a template.
+All in `config/project.yaml`, which is read instead of `config/project.example.yaml` (the example stays as the template with the original defaults; the table's Default column is the example's). `project.yaml` currently has setting "A" for `my video new.MOV`: whole clip, shot `full_A`, style LoRA `bloodlust_style` at 0.6 (actor LoRA off), prompt adds `black hair, red eyes`, denoise 0.6, ControlNet 0.8. Running `cli.py` (or the VS Code run button) with it reuses the finished `full_A` frames; for another experiment give it a new `input.shot`. Note that the file is a complete copy: new keys added to the example later must be copied in by hand.
 
 | Key | Meaning | Default |
 |---|---|---|
@@ -281,6 +281,16 @@ They do not test the ComfyUI graphs themselves. Phase 1, a real preview and a Ka
 | `cli.py animatediff` or `deflicker` says the settings changed | The default `animatediff.ip_adapter.enabled` changed to off. Shots made earlier with it on are protected; use a new shot name. |
 | Unzipped Kaggle result is not found by `cli.py flicker` | The folders must be in `work/default/`, not in `result_<shot>/work/default/`. Copy them over (do not overwrite other shots). |
 
+## 14b. Phase 4: training data (started)
+
+Put the film in `training/input/` and photos of each actor in `training/data/actors/<name>/` (see `training/README.md`). Run `training/extract_style.py` (VS Code: "Phase 4: extract style frames") to fill `training/data/style/images/`, then check `contact_sheet.jpg` there. Settings are under `training:` in the config. Then run `training/caption.py` (VS Code: "Phase 4: caption style frames and actor photos"): it converts the actor photos (HEIC ok) to `training/data/actors_ready/<name>/` (`photo_NNN.jpg`, the full photo) and adds a face crop (`_face`) and an upper-body crop (`_upper`) cut from the original full-resolution photo next to it, nothing replaced (YuNet face detector, about 230 KB, downloaded once; `training.actors.crops: false` turns it off; crops are skipped when the face is too small, a second person is in the shot, or the crop is nearly the whole photo), downloads the WD14 tagger once (about 380 MB, CPU) and writes a `.txt` caption next to every image. Trigger words: `training.style.trigger` (default `bloodlust_style`) and `<name>_person` for actors (override with `training.actors.<name>.trigger`). Existing captions are never overwritten, so hand edits stay; delete a `.txt` to regenerate. 
+
+**Training (local, 6 GB).** Once: `scripts/setup_training.py` (VS Code: "Phase 4: set up the training environment"; clones kohya sd-scripts into `third_party/` and builds `.venv-train`, a separate venv so `.venv` is untouched). Then close ComfyUI (it holds the GPU; the script refuses to start while port 8188 is open) and run `training/train.py --target style` or `--target Adwait` (VS Code entries for both, plus a 20-step smoke test). Output: `training/output/<name>/<name>.safetensors`, with an intermediate checkpoint every 2 epochs. Measured on the RTX 2060: 1.25 steps/s, about 3.6 GB of GPU memory, so 2400 to 2500 steps take about 33 minutes. The base model is the config's checkpoint (Counterfeit) at clip skip 1, to match the ComfyUI workflows, which have no clip-skip node. A finished LoRA is never overwritten: with changed settings the run stops; set `training.<target>.run` to a new name. 
+
+**Checking a LoRA.** `training/eval_grid.py --target Adwait|style` (VS Code entries for both) copies the LoRA files into ComfyUI's `models/loras`, starts ComfyUI if needed, and renders the same 4 prompts with the same seed for the plain checkpoint, each saved epoch at weight 0.8 and the final file at two other weights (32 images, about 5 minutes). Result: `training/output/eval/<name>/grid.jpg` plus the single images. Results of the first run (actor `adwait_person`, style `bloodlust_style`, both 2400 to 2500 steps) are in `docs/phase4-results.md`. 
+
+**Using LoRAs in the conversion.** List them under `style.loras` in the config (file, weight, optional trigger word and extra negatives; see the example in `config/project.example.yaml`). `cli.py run` / `preview` then chain a `LoraLoader` per entry into the img2img graph, add the trigger words to the prompt, and copy the files from `training/output/` into ComfyUI's `models/loras` if needed. The default is an empty list, which gives exactly the old graph. The list is part of the shot's recorded settings: change it and the shot stops, so use a new shot name. To try a variant without editing your config, set the environment variable `ANIME_CONFIG` to another yaml file. The AnimateDiff cloud workflow uses the same list: the bundle carries the LoRA files and the notebook copies them into ComfyUI (`docs/cloud-kaggle.md`).
+
 ## 15. Not built yet
 
 From `plan.md`: phase 3 is done (local deflicker, and the AnimateDiff cloud stage on Kaggle). Optional phase 3 work still open: IP-Adapter at weights below 0.5, and trying more clips (the settings were tuned on one clip and held up on a second). RAFT optical flow was tried in the deflicker and not kept: no gain on either test clip, even in fast camera pans (`phase3-guide.md` section 5.5). Then phase 4 (LoRA training), phase 5 (matting, compositing, face pass) and phase 6 (per-shot config list, web UI, cloud worker). The numbers to compare against, on `dance_run1`, are in section 7 and `docs/phase3-guide.md`.
@@ -308,3 +318,11 @@ Add a line here whenever something is added or changed that affects how the proj
 | 2026-10-31 | IP-Adapter is now off by default in the cloud stage (`animatediff.ip_adapter.enabled: false`): AnimateDiff alone was as steady and kept the source's colors better. `download_models.py --cloud` skips its 2.6 GB of models when it is off. |
 | 2026-10-31 | This document and the README now say what is in git and what is generated or rebuilt (`.venv`, `third_party`, `work`), how to set up from a fresh clone, and how to run phase 3 end to end (section 7). |
 | 2026-10-31 | Added `docs/phase3-guide.md` (design, files, tuning and results of phase 3) and moved the phase 3 results there from `phase2-results.md`. |
+| 2026-11-01 | Phase 4 started: `training/extract_style.py` (film to style frames with contact sheet), `training/` folders for the film and actor photos, `training:` config section, one VS Code run config. Captioning and training not built yet. |
+| 2026-11-02 | Phase 4: `training/caption.py` (actor photo conversion, WD14 captioning with trigger words); new dependencies in `.venv`: `onnxruntime` (CPU), `pillow-heif`. |
+| 2026-11-02 | Phase 4: actor photos also get face and upper-body crops (`pipeline/photo_crops.py`, YuNet) next to the full photos; the contact sheet in `actors_ready/<name>/` shows all of them. |
+| 2026-11-02 | Phase 4: local LoRA training: `scripts/setup_training.py` (kohya sd-scripts + `.venv-train`), `training/train.py`, `training.lora` config, four VS Code entries. |
+| 2026-11-02 | Phase 4: first LoRAs trained (actor `adwait_person`, style `bloodlust_style`), `training/eval_grid.py` (comparison grid) and two VS Code entries. |
+| 2026-11-02 | Phase 4: `style.loras` in the config puts trained LoRAs into the local img2img graph; `ANIME_CONFIG` env var picks another config file. First test: shot `dance_lora1` (see `docs/phase4-results.md`). |
+| 2026-11-03 | `config/project.yaml` created with the selfie setting "A" (style LoRA 0.6, denoise 0.6, ControlNet 0.8, actor LoRA off, whole clip `my video new.MOV`, shot `full_A`); the LoRA test now sets its own `style.loras`. Deflicker of `full_A` and `full_C` measured in `docs/phase4-results.md`. |
+| 2026-11-03 | Cloud stage carries LoRAs: `style.loras` goes into the AnimateDiff graph, `make_cloud_bundle.py` packs the LoRA files under `loras/`, notebook step 3 copies them into ComfyUI. Bundle for `full_A` built (`work/cloud/bundle_full_A.zip`, 129 MB). Rebuild and re-upload the Kaggle dataset after this change: the old notebook and code do not know LoRAs. |

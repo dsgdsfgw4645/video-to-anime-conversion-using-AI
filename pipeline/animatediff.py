@@ -19,7 +19,7 @@ from PIL import Image
 from pipeline.comfy_client import ComfyClient
 from pipeline.server import comfy_server
 from pipeline.shot_state import SETTINGS, prepare
-from pipeline.stylize import ROOT, lineart_resolution
+from pipeline.stylize import ROOT, apply_loras, install_loras, lineart_resolution
 from pipeline.vram import VramMonitor
 
 WORKFLOW = ROOT / "workflows" / "animatediff_lineart_api.json"
@@ -43,8 +43,7 @@ def build_workflow(cfg: dict, frames_dir: Path, reference_name: str | None, size
     wf["3"]["inputs"]["megapixels"] = cfg["video"]["target_megapixels"]
     wf["7"]["inputs"]["resolution"] = lineart_resolution(
         wf["3"]["inputs"]["megapixels"], size, wf["3"]["inputs"]["resolution_steps"])
-    wf["4"]["inputs"]["text"] = cfg["style"]["positive"]
-    wf["5"]["inputs"]["text"] = cfg["style"]["negative"]
+    positive, negative = cfg["style"]["positive"], cfg["style"]["negative"]
     wf["6"]["inputs"]["cnet"] = cfg["models"]["controlnet_lineart"]
     wf["8"]["inputs"]["strength"] = cfg["controlnet"]["lineart_strength"]
     wf["10"]["inputs"].update(
@@ -60,6 +59,11 @@ def build_workflow(cfg: dict, frames_dir: Path, reference_name: str | None, size
         for node in IP_NODES:
             del wf[node]
         wf["18"]["inputs"]["model"] = ["1", 0]
+    # style.loras: a LoraLoader chain after the checkpoint feeds the node that read the checkpoint's model
+    # (the IP-Adapter loader, or AnimateDiff itself when IP-Adapter is off) and both prompt encoders
+    positive, negative = apply_loras(wf, cfg["style"].get("loras") or [], positive, negative,
+                                     model_node="15" if ad["ip_adapter"]["enabled"] else "18")
+    wf["4"]["inputs"]["text"], wf["5"]["inputs"]["text"] = positive, negative
     return wf
 
 
@@ -93,6 +97,7 @@ def animatediff_shot(cfg: dict, project_dir: Path, shot: str,
     prepare(out_dir, animatediff_settings(cfg, frames_dir, seed, denoise))
     if len(list(out_dir.glob("frame_*.png"))) == len(frames):
         return 0
+    install_loras(cfg)   # copies from training/output/ if needed; in the cloud the notebook put them in models/loras
     ip = cfg["animatediff"]["ip_adapter"]
     reference = ROOT / ip["reference"]
     if ip["enabled"] and not reference.exists():

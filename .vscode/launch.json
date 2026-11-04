@@ -5,6 +5,78 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Phase 4: extract style frames (film in training/input)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/training/extract_style.py",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Phase 4: caption style frames and actor photos",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/training/caption.py",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Phase 4: set up the training environment (once)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/setup_training.py",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Phase 4: train style LoRA (close ComfyUI first)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/training/train.py",
+            "args": ["--target", "style"],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Phase 4: train actor LoRA Adwait (close ComfyUI first)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/training/train.py",
+            "args": ["--target", "Adwait"],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Phase 4: training smoke test (20 steps, Adwait)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/training/train.py",
+            "args": ["--target", "Adwait", "--smoke"],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Phase 4: comparison grid for the actor LoRA (Adwait)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/training/eval_grid.py",
+            "args": ["--target", "Adwait"],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Phase 4: comparison grid for the style LoRA",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/training/eval_grid.py",
+            "args": ["--target", "style"],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal"
+        },
+        {
             "name": "Phase 2: convert video (config input)",
             "type": "debugpy",
             "request": "launch",

@@ -126,7 +126,7 @@ The names in this plan are the planned ones. What exists:
 | `pipeline/temporal.py` | exists: the OpenCV Farneback deflicker; `pipeline/animatediff.py` runs the AnimateDiff pass |
 | `pipeline/composite.py` | not built (phase 5) |
 | `cli.py anime run\|preview\|train\|shots` | `cli.py run`, `preview`, `flicker`, `deflicker`, `animatediff`, `encode`; no `train` or `shots` yet |
-| `training/` | not started (phase 4) |
+| `training/` | started: `extract_style.py`; captioning, training, eval not built |
 
 ## Shooting tips (for best results, as Corridor did)
 - Use flat, even lighting and a greenscreen or simple background.

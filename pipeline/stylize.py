@@ -6,6 +6,8 @@ is renumbered, update build_workflow().
 """
 import json
 import math
+import os
+import shutil
 from pathlib import Path
 
 import yaml
@@ -19,8 +21,11 @@ LINEART_NODE = "13"
 
 
 def load_config() -> dict:
-    """Read config/project.yaml, falling back to config/project.example.yaml."""
-    cfg = ROOT / "config" / "project.yaml"
+    """Read config/project.yaml, falling back to config/project.example.yaml.
+
+    The environment variable ANIME_CONFIG (a path) overrides both, for trying a variant without editing the config.
+    """
+    cfg = Path(os.environ["ANIME_CONFIG"]) if os.environ.get("ANIME_CONFIG") else ROOT / "config" / "project.yaml"
     if not cfg.exists():
         cfg = ROOT / "config" / "project.example.yaml"
     return yaml.safe_load(cfg.read_text(encoding="utf-8"))
@@ -35,6 +40,49 @@ def lineart_resolution(megapixels: float, size: tuple[int, int], step: int = 8) 
     w, h = size
     scale = math.sqrt(megapixels * 1024 * 1024 / (w * h))
     return min(round(w * scale / step), round(h * scale / step)) * step
+
+
+LORA_DIR = ROOT / "third_party" / "ComfyUI" / "models" / "loras"
+
+
+def install_loras(cfg: dict) -> None:
+    """Make sure every LoRA named in style.loras is in ComfyUI's models/loras, copying it from training/output/ if not."""
+    for lora in cfg["style"].get("loras") or []:
+        dst = LORA_DIR / lora["name"]
+        if dst.exists():
+            continue
+        found = sorted((ROOT / "training" / "output").glob(f"*/{lora['name']}"))
+        if not found:
+            raise FileNotFoundError(f"LoRA {lora['name']} is in neither {LORA_DIR} nor training/output/<run>/. Train it first.")
+        LORA_DIR.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(found[0], dst)
+
+
+def apply_loras(wf: dict, loras: list[dict], positive: str, negative: str, model_node: str = "10") -> tuple[str, str]:
+    """Chain a LoraLoader per entry after the checkpoint (node 1) and rewire what read the checkpoint's model and clip.
+
+    Entries: {name, weight, trigger (optional, put first in the prompt), negative (optional, added to the negative prompt)}.
+    New nodes get ids "20", "21", ... Returns the positive and negative prompt with the triggers / extra negatives added.
+    model_node: the node whose "model" input receives the LoRA'd model ("10" = the KSampler of the img2img graph;
+    the AnimateDiff graph passes the node that reads the checkpoint's model).
+    """
+    model, clip = ["1", 0], ["1", 1]
+    triggers, extra = [], []
+    for i, lora in enumerate(loras or []):
+        node = str(20 + i)
+        wf[node] = {"class_type": "LoraLoader", "inputs": {
+            "model": model, "clip": clip, "lora_name": lora["name"],
+            "strength_model": lora["weight"], "strength_clip": lora["weight"]}}
+        model, clip = [node, 0], [node, 1]
+        if lora.get("trigger"):
+            triggers.append(lora["trigger"])
+        if lora.get("negative"):
+            extra.append(lora["negative"])
+    if loras:
+        wf[model_node]["inputs"]["model"] = model
+        wf["4"]["inputs"]["clip"] = clip
+        wf["5"]["inputs"]["clip"] = clip
+    return ", ".join(triggers + [positive]), ", ".join([negative] + extra)
 
 
 def build_workflow(
@@ -57,8 +105,8 @@ def build_workflow(
     wf["3"]["inputs"]["megapixels"] = cfg["video"]["target_megapixels"]
     wf["7"]["inputs"]["resolution"] = lineart_resolution(
         wf["3"]["inputs"]["megapixels"], size, wf["3"]["inputs"]["resolution_steps"])
-    wf["4"]["inputs"]["text"] = cfg["style"]["positive"]
-    wf["5"]["inputs"]["text"] = cfg["style"]["negative"]
+    wf["4"]["inputs"]["text"], wf["5"]["inputs"]["text"] = apply_loras(
+        wf, cfg["style"].get("loras"), cfg["style"]["positive"], cfg["style"]["negative"])
     wf["6"]["inputs"]["control_net_name"] = cfg["models"]["controlnet_lineart"]
     wf["8"]["inputs"]["strength"] = cfg["controlnet"]["lineart_strength"]
     wf["10"]["inputs"].update(

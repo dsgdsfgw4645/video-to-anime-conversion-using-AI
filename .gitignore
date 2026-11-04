@@ -5,3 +5,10 @@ __pycache__/
 .pytest_cache/
 *.pyc
 result_*/
+
+# phase 4: training inputs and outputs (copyrighted films, personal photos, trained weights)
+training/input/
+training/data/
+training/output/
+training/models/
+.venv-train/
