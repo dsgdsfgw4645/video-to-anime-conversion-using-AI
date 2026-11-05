@@ -76,7 +76,7 @@ What it means for phase 3: there is less than 1 GB of headroom. Adding AnimateDi
 
 ## 7. Known issues and pending
 
-- The checkpoint lightens skin tones and re-colors clothing between source and anime, differently on every frame. Phase 3's AnimateDiff keeps the colors much steadier; IP-Adapter did not help (`phase3-guide.md` section 5). A style/actor LoRA (phase 4) is still the way to change the checkpoint's look.
+- The checkpoint lightens skin tones and re-colors clothing between source and anime, differently on every frame. Phase 3's AnimateDiff keeps the colors much steadier; IP-Adapter did not help (`phase3-guide.md` section 5). A style LoRA (phase 4) changes the checkpoint's look and is now used through `style.loras` (`phase4-results.md`).
 - Small figures in wide shots lose faces and detail at 0.4 MP.
 - No temporal consistency in this per-frame stage: each frame is independent apart from the shared seed. Phase 3 adds it (`phase3-guide.md`).
 - No scene detection or multi-shot handling yet (the `input:` section would become a list of shots in phase 6).

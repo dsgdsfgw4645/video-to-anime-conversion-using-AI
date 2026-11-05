@@ -65,7 +65,7 @@ That is why `models\clip`, `models\vae`, `models\text_encoders` and `models\unet
 
 | Folder under `third_party\ComfyUI\models\` | Planned for | What happened |
 |---|---|---|
-| `loras\` | Style LoRA and one LoRA per actor | empty; phase 4, not started |
+| `loras\` | Style LoRA and one LoRA per actor | in use (phase 4): `style.loras` in the config copies the trained files here from `training/output/` |
 | `controlnet\` (more files) | Depth, OpenPose ControlNets | not built; phase 3 uses only the lineart ControlNet |
 | `clip_vision\` | CLIP-Vision model for IP-Adapter | empty locally; IP-Adapter is built but off by default, and its models are only downloaded on Kaggle when it is enabled |
 | `ipadapter\` | IP-Adapter weights | does not exist locally, for the same reason |
@@ -196,7 +196,7 @@ Python 3.11, Git, FFmpeg and a newer Visual C++ Redistributable (all via winget,
 
 ### Out of phase 1's scope, so correctly absent
 
-Video ingest and encode and a CLI (built in phase 2, see `phase2-results.md`). AnimateDiff and the deflicker (built in phase 3, see `phase3-guide.md` and `cloud-kaggle.md`). Matting, other ControlNets, LoRAs and compositing are phases 4 to 6, not built yet.
+Video ingest and encode and a CLI (built in phase 2, see `phase2-results.md`). AnimateDiff and the deflicker (built in phase 3, see `phase3-guide.md` and `cloud-kaggle.md`). LoRAs are built (phase 4, `docs/phase4-results.md`). Matting, other ControlNets and compositing are phases 5 and 6, not built yet.
 
 ---
 

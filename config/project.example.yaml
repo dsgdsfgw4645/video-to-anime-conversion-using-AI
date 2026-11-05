@@ -50,6 +50,8 @@ animatediff:           # phase 3 cloud stage (cli.py animatediff): the whole sho
 temporal:              # phase 3 flow-warp deflicker (cli.py deflicker); CPU only
   strength: 0.9        # weight of the motion-warped previous frame where the flow is trusted (0 = off)
   lowpass_sigma: 2     # blend only colors/tones coarser than this many pixels, keeping the fresh frame's edges (0 = blend all)
+                       # 2 was tuned on the dance clip; on a close-up face it drags the cel shading around, so use 8 there
+                       # (config/project.yaml does; docs/phase4-results.md has the comparison)
   error_threshold: 25  # source color error (0-255) above which the warp is ignored (occlusions, fast motion)
 
 video:

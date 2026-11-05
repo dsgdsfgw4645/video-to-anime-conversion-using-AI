@@ -105,12 +105,13 @@ Every stage reads and writes `work/<project>/<stage>/<shot>/frame_%05d.png`. Thi
 Python 3.11, ffmpeg, PySceneDetect, OpenCV, PyTorch, ComfyUI, and these ComfyUI custom nodes: AnimateDiff-Evolved, Advanced-ControlNet, IPAdapter_plus, controlnet_aux preprocessors, VideoHelperSuite. Also RobustVideoMatting / SAM2, InsightFace, RAFT, RIFE, kohya_ss, Typer, and later FastAPI.
 
 ## Phased roadmap
-*Status: phases 1, 2 and 3 are done; 4 to 6 are not started.*
+*Status: phases 1, 2 and 3 are done; phase 4 is built apart from `cli.py train`; 5 and 6 are not started.*
 1. **Setup:** install ComfyUI and models locally. Prove one-frame img2img with ControlNet lineart on the 2060.
 2. **Frame pipeline MVP:** ingest → per-frame img2img → encode. This is the original Corridor approach, used as the baseline.
 3. **Consistency:** add AnimateDiff, IP-Adapter and the deflicker/flow blend. Compare flicker against the baseline.
    *Status: done (see `docs/phase3-guide.md`). What was built: a local optical-flow deflicker (`pipeline/temporal.py`, CPU) and a one-pass AnimateDiff + lineart ControlNet stage that runs on a Kaggle GPU (`pipeline/animatediff.py`, `notebooks/`). Differences from the plan: IP-Adapter is built but **off by default** (it did not help on the test clip); the workflow is `workflows/animatediff_lineart_api.json` (lineart only, no depth/openpose); the deflicker uses OpenCV Farneback flow, not EbSynth/RIFE (RAFT was tried in the deflicker and not kept: no gain on two test clips, including fast camera pans). Best result on `dance_run1`: AnimateDiff alone + deflicker. Tuned on one clip and confirmed on a second, handheld one (see `docs/phase3-guide.md` section 5.6).*
 4. **Training:** build the style LoRA and actor LoRAs on cloud GPU, then integrate them.
+   *Status: built, and trained **locally** on the 6 GB card, not on cloud (`docs/phase4-results.md`). What was built: style-frame extraction from a film, WD14 captioning with trigger words, face and upper-body crops of actor photos, kohya sd-scripts training in a separate `.venv-train` (about 33 min per LoRA), comparison grids, and `style.loras` in the config, which chains `LoraLoader` nodes into both the local img2img graph and the AnimateDiff cloud graph. Differences from the plan: training runs locally (512 px, batch 1, AdamW8bit, gradient checkpointing); there is no `cli.py train`. Result on the test footage: the **style** LoRA works and gives the wanted look; the **actor** LoRA, trained on real photos, pulls the face back to photographic and is off by default (`docs/phase4-results.md`).*
 5. **Composite and polish:** matting, separate background, face pass, anime VFX, audio.
 6. **Productize:** project.yaml per-shot overrides, resumable jobs, FastAPI web UI, cloud worker (RunPod serverless running the same ComfyUI image).
 
@@ -126,7 +127,7 @@ The names in this plan are the planned ones. What exists:
 | `pipeline/temporal.py` | exists: the OpenCV Farneback deflicker; `pipeline/animatediff.py` runs the AnimateDiff pass |
 | `pipeline/composite.py` | not built (phase 5) |
 | `cli.py anime run\|preview\|train\|shots` | `cli.py run`, `preview`, `flicker`, `deflicker`, `animatediff`, `encode`; no `train` or `shots` yet |
-| `training/` | started: `extract_style.py`; captioning, training, eval not built |
+| `training/` | `extract_style.py`, `caption.py`, `train.py`, `eval_grid.py` (+ `pipeline/style_frames.py`, `captioning.py`, `photo_crops.py`, `lora_train.py`, `lora_eval.py`); training is local, not cloud |
 
 ## Shooting tips (for best results, as Corridor did)
 - Use flat, even lighting and a greenscreen or simple background.

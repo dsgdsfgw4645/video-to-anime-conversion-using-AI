@@ -68,6 +68,19 @@ Results and the flicker baseline are in [docs/phase2-results.md](docs/phase2-res
 
 The AnimateDiff stage needs about 16 GB of GPU memory, so it runs in a Kaggle notebook (`notebooks/kaggle_animatediff.ipynb`), not on this machine. Upload the zip as a Kaggle dataset, run the notebook, unzip the result into the project folder and measure it with `cli.py flicker --stage animatediff`. Step by step: [docs/how-to-run.md](docs/how-to-run.md#7-phase-3-steadier-video-deflicker-and-the-cloud-stage) and [docs/cloud-kaggle.md](docs/cloud-kaggle.md). Design, tuning and results: [docs/phase3-guide.md](docs/phase3-guide.md).
 
+## Style and actor LoRAs (phase 4)
+
+Trained locally on the same 6 GB card with [kohya sd-scripts](https://github.com/kohya-ss/sd-scripts), about 33 minutes per LoRA. Run `scripts/setup_training.py` once; it clones sd-scripts and builds a separate `.venv-train`.
+
+```powershell
+.venv\Scripts\python.exe training\extract_style.py      # a film in training/input/ -> style frames + contact sheet
+.venv\Scripts\python.exe training\caption.py            # converts actor photos, adds face/upper-body crops, writes captions
+.venv\Scripts\python.exe training	rain.py --target style    # or --target <ActorName>; --smoke for a 20-step check
+.venv\Scripts\python.exe training\eval_grid.py --target style  # comparison grid of every saved epoch and weight
+```
+
+List the finished LoRAs under `style.loras` in the config (file, weight, trigger word, optional extra negatives) and both the local img2img graph and the AnimateDiff cloud graph use them. Where to put the film and the photos: [training/README.md](training/README.md). Results, the chosen weights and what did not work: [docs/phase4-results.md](docs/phase4-results.md).
+
 ## Layout
 
 | Path | Purpose |
@@ -83,13 +96,17 @@ The AnimateDiff stage needs about 16 GB of GPU memory, so it runs in a Kaggle no
 | `pipeline/temporal.py` | phase 3 deflicker (optical-flow blend, CPU) |
 | `pipeline/animatediff.py` | phase 3 cloud stage: one AnimateDiff pass over a whole shot (needs about 16 GB GPU) |
 | `pipeline/vram.py` | peak GPU memory of a run |
+| `pipeline/style_frames.py` | phase 4: pulls style training frames out of a film |
+| `pipeline/captioning.py`, `pipeline/photo_crops.py` | phase 4: WD14 captions, face and upper-body crops of actor photos |
+| `pipeline/lora_train.py`, `pipeline/lora_eval.py` | phase 4: kohya training run, and the comparison grid |
+| `training/` | phase 4 entry points (`extract_style.py`, `caption.py`, `train.py`, `eval_grid.py`) and the data folders (git-ignored) |
 | `tests/` | automated tests (no GPU needed) |
-| `docs/` | `how-to-run.md` (run reference), `phase1-guide.md`, `phase2-results.md`, `phase3-guide.md`, `cloud-kaggle.md` |
+| `docs/` | `how-to-run.md` (run reference), `phase1-guide.md`, `phase2-results.md`, `phase3-guide.md`, `cloud-kaggle.md`, `phase4-results.md` |
 | `.vscode/` | interpreter setting and run configurations |
 | `samples/` | test clips |
 | `workflows/` | ComfyUI API-format workflow graphs |
-| `scripts/` | model download, server launcher, phase 1 smoke test, `make_cloud_bundle.py` (zip for Kaggle) |
+| `scripts/` | model download, server launcher, phase 1 smoke test, `make_cloud_bundle.py` (zip for Kaggle), `setup_training.py` (phase 4 training environment) |
 | `notebooks/` | the Kaggle notebook for the cloud stage |
 | `config/` | project settings |
 | `third_party/ComfyUI` | local ComfyUI checkout (not ours); git-ignored, created by the setup commands |
-| `.venv/`, `work/` | git-ignored: the Python environment (setup commands) and everything a run generates |
+| `.venv/`, `.venv-train/`, `work/` | git-ignored: the two Python environments (setup commands) and everything a run generates |

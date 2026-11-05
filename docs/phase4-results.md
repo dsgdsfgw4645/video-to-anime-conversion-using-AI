@@ -1,4 +1,9 @@
-# Phase 4 results: first LoRAs (2026-11-02)
+# Phase 4 results: LoRA training and use (2026-11-02 to 2026-11-05)
+
+**Where it landed.** The style LoRA works and is on by default; the actor LoRA is off, because trained on real
+photos it pulls the face back to photographic. The settled recipe for the selfie clip is in `config/project.yaml`:
+style LoRA at 0.6, denoise 0.6, ControlNet 0.8, prompt plus `black hair, red eyes`, deflicker `lowpass_sigma: 8`,
+and the local per-frame path rather than the AnimateDiff cloud pass. Sections below, oldest first.
 
 Trained locally on the RTX 2060 with kohya sd-scripts (`training/train.py`), base checkpoint Counterfeit-V3.0, rank 32 / alpha 16, 512 px, batch 1, AdamW8bit, 1.24 steps/s, peak about 3.6 GB.
 Grids (same seed and prompts for every column): `training/output/eval/<name>/grid.jpg`, made by `training/eval_grid.py`.
@@ -26,13 +31,10 @@ Style `bloodlust_style` at 0.5 + actor `adwait_person` epoch 4 at 0.7, denoise 0
 - The actor LoRA cannot be judged on this clip: the dancers are other people. It needs footage of the actor.
 
 ## Actor test on a selfie clip (`me_lora1`, 3 s, 36 frames)
-Footage of the actor (portrait selfie, `my video.MOV` in the project root, not in git). Style 0.6 + actor epoch 4 at 0.7, denoise 0.5, negatives `beanie, headband, hat`. 16.4 s/frame, peak 5379 MiB. Picture: `work/default/compare_me1.png` (top: source, bottom: result, frames 1, 12, 24, 36); video `work/default/out/me_lora1.mp4`.
+Footage of the actor (portrait selfie, `my video.MOV` in the project root, never in git: the repo is public). That clip was later replaced by `my video new.MOV`, which has steadier lighting; the runs below use the new one. Style 0.6 + actor epoch 4 at 0.7, denoise 0.5, negatives `beanie, headband, hat`. 16.4 s/frame, peak 5379 MiB. Picture: `work/default/compare_me1.png` (top: source, bottom: result, frames 1, 12, 24, 36); video `work/default/out/me_lora1.mp4`.
 - The face, glasses and hair follow the source (the lineart ControlNet holds the structure), so the likeness comes mostly from the source, not from the actor LoRA. Whether the LoRA adds anything needs an ablation (same shot without it).
 - Still very photographic: at denoise 0.5 the skin becomes flat orange cel patches with blotchy shading (frames 24 and 36), not a clean anime look.
 - Unsteady details: eye color changes between frames (grey, brown, blue, red), the glasses frame color shifts, the shirt text turns into gibberish.
-
-## Not done yet
-`cli.py train`, and the AnimateDiff cloud run with the style LoRA (graph, bundle and notebook carry LoRAs since 2026-11-03; `bundle_full_A.zip` is built, the run itself is pending).
 
 ## Ablation on the selfie clip (12 frames, same seed; `work/default/compare_ablation.png`)
 
@@ -54,3 +56,41 @@ Actor LoRA off. Prompt adds `black hair, red eyes`; the LoRA's own negatives are
 
 - Hair and eyes now read as anime on every frame; the deflicker (CPU) makes both clearly steadier and softens fine lines slightly.
 - Remaining flaws: glasses frame colour changes (red, grey, black), short green or streaked hair patches (A frame 60, C frame 60), and in C a washed-out white face in frame 1 and an exaggerated muscular neck and chest.
+
+## Cloud AnimateDiff run of `full_A`, and the deflicker artifact (2026-11-05)
+
+### The cloud pass loses the anime look
+`result_full_A/` (Kaggle, AnimateDiff + the style LoRA at 0.6, denoise 0.6). `settings.json` confirms the LoRA was
+applied, so the bundle and notebook changes work. The output is still softer and more photographic than the local
+`full_A`: the hard cel shadows and the bold lineart are gone, and the face is rounder. Cause: AnimateDiff's motion
+module adds temporal attention trained on real video, which both dilutes the style LoRA and smooths the
+high-frequency detail that the cel look is made of. Raising the LoRA weight or the denoise for the cloud run would
+fight it but not remove it. For this clip the local per-frame path gives the wanted look; AnimateDiff does not.
+
+### The deflicker smeared the face (fixed: `lowpass_sigma` 2 -> 8)
+`full_A_deflicker` and `full_C_deflicker` washed out the face's cel shadows and slid blotches around (a pink smear
+on the shirt at frame 50, a flattened face at frame 70). Cause: at `lowpass_sigma: 2` the face's own shading counts
+as "low frequency" and is dragged along the optical flow of a nearly flat face, where Farneback flow is unreliable;
+each output frame feeds the next, so the error accumulates and moves. Variants on `full_A` (76 frames):
+
+| Settings | SSIM ratio | Static change | Colour f2f | Look |
+|---|---|---|---|---|
+| plain (no deflicker) | 0.886 | 8.35 | 2.14 | reference |
+| strength 0.9, sigma 2, err 25 (old) | 0.969 | 4.51 | 1.29 | smeared, washed-out face |
+| **strength 0.9, sigma 8, err 25 (new)** | 0.906 | 6.23 | 1.41 | **cel shadows kept, flicker down** |
+| strength 0.6, sigma 8, err 15 | 0.901 | 6.80 | 1.64 | as above, slightly less steady |
+| strength 0.5, sigma 12, err 15 | 0.892 | 7.26 | 1.76 | closest to plain, least smoothing |
+
+The old settings score best on every number because the metrics reward averaging, which is exactly the smearing
+complained about. Judge this stage by eye, not by the SSIM ratio alone.
+
+### IP-Adapter would not fix the cloud look
+It conditions colours and style on a reference image, but the cloud problem is lost cel shading and lineart, not
+colour drift, and phase 3 already found it did not help (`docs/phase3-guide.md` section 5). Not re-enabled.
+
+## Not done yet
+- `cli.py train` (training is run through the scripts in `training/`).
+- A **v2 actor LoRA** trained on anime-styled versions of the photos, which is how Corridor got an actor's likeness in
+  the anime style. The current one is trained on the photos as they are, which is why it fights the anime look.
+- More actor photos without the headband, in other clothes and places, to cut the background and outfit leaks.
+- Phase 5 (matting, compositing, face pass): likely a bigger win on this footage than more LoRA tuning.

@@ -187,7 +187,7 @@ A full pass from nothing, all from the IDE:
 5. **Phase 2: flicker check (config shot)**.
 6. Optional, for steadier results (section 7): **Phase 3: deflicker (config shot)**, or the Kaggle AnimateDiff route.
 
-Phases 4 to 6 (training, compositing, product) are not built yet (section 15).
+Phase 4 (LoRA training) is built and has its own run configurations (section 14b and `training/README.md`). Phases 5 and 6 (compositing, product) are not built yet (section 15).
 
 ## 9. Settings you change
 
@@ -205,7 +205,7 @@ All in `config/project.yaml`, which is read instead of `config/project.example.y
 | `models.checkpoint`, `models.controlnet_lineart` | Which model files to use. | Counterfeit-V3.0, lineart anime |
 | `style.positive`, `style.negative` | The prompts. | anime, cel shading, clean lineart ... |
 | `animatediff.*` | The cloud stage: motion module, window size, and `ip_adapter.enabled` (off by default) / `weight` / `reference`. Used by `cli.py animatediff` (cloud GPU only; see `docs/cloud-kaggle.md`). | `v3_sd15_mm.ckpt`, 16, 4, off, 0.5 |
-| `temporal.strength`, `temporal.lowpass_sigma`, `temporal.error_threshold` | Phase 3 deflicker: weight of the warped previous frame (0.9), the blur radius in pixels below which colors are blended so edges stay crisp (2; 0 blends everything and softens), and the source color error above which the warp is ignored (25). Changing them under an existing shot stops the run; use a new shot name. | `0.9`, `2`, `25` |
+| `temporal.strength`, `temporal.lowpass_sigma`, `temporal.error_threshold` | Phase 3 deflicker: weight of the warped previous frame (0.9), the blur radius in pixels below which colors are blended so edges stay crisp, and the source color error above which the warp is ignored (25). **Sigma: 2 for a wide shot, 8 for a close-up face** — at 2 a face's cel shading is dragged along the optical flow and smears (`docs/phase4-results.md`); `project.yaml` uses 8. Changing them under an existing shot stops the run; use a new shot name. | `0.9`, `2` (`project.yaml`: `8`), `25` |
 | `sampling.seed` | Same seed on every frame of a shot, to limit flicker. | `12345` |
 | `sampling.denoise` | How far the result moves from the source: lower stays closer. | `0.4` |
 | `sampling.steps`, `cfg`, `sampler`, `scheduler` | Sampler settings. | 24, 7.0, euler_ancestral, normal |
@@ -277,11 +277,11 @@ They do not test the ComfyUI graphs themselves. Phase 1, a real preview and a Ka
 | Kaggle: `No project found under /kaggle/input` | Add your dataset to the notebook (Add Input). Re-upload if it is empty. |
 | Kaggle: `ComfyUI does not have these nodes: ...` or `Node 'ACN_...' not found` | Run notebook step 2 again (installs the node packs), then step 4 (starts a fresh ComfyUI; a running one never sees new nodes). Use the current notebook and a freshly packed bundle. |
 | Kaggle runs old code | The notebook runs the code in your uploaded dataset. After changing code, pack a new bundle and upload it as a new dataset version. |
-| A bundle zip is only 1 KB | A failed pack can leave an empty zip. The real one is 44 to 94 MB, depending on the clip; delete the empty one and pack again. |
+| A bundle zip is only 1 KB | A failed pack can leave an empty zip. The real one is 44 to 130 MB, depending on the clip and the LoRAs; delete the empty one and pack again. |
 | `cli.py animatediff` or `deflicker` says the settings changed | The default `animatediff.ip_adapter.enabled` changed to off. Shots made earlier with it on are protected; use a new shot name. |
 | Unzipped Kaggle result is not found by `cli.py flicker` | The folders must be in `work/default/`, not in `result_<shot>/work/default/`. Copy them over (do not overwrite other shots). |
 
-## 14b. Phase 4: training data (started)
+## 14b. Phase 4: LoRA training and use
 
 Put the film in `training/input/` and photos of each actor in `training/data/actors/<name>/` (see `training/README.md`). Run `training/extract_style.py` (VS Code: "Phase 4: extract style frames") to fill `training/data/style/images/`, then check `contact_sheet.jpg` there. Settings are under `training:` in the config. Then run `training/caption.py` (VS Code: "Phase 4: caption style frames and actor photos"): it converts the actor photos (HEIC ok) to `training/data/actors_ready/<name>/` (`photo_NNN.jpg`, the full photo) and adds a face crop (`_face`) and an upper-body crop (`_upper`) cut from the original full-resolution photo next to it, nothing replaced (YuNet face detector, about 230 KB, downloaded once; `training.actors.crops: false` turns it off; crops are skipped when the face is too small, a second person is in the shot, or the crop is nearly the whole photo), downloads the WD14 tagger once (about 380 MB, CPU) and writes a `.txt` caption next to every image. Trigger words: `training.style.trigger` (default `bloodlust_style`) and `<name>_person` for actors (override with `training.actors.<name>.trigger`). Existing captions are never overwritten, so hand edits stay; delete a `.txt` to regenerate. 
 
@@ -291,9 +291,25 @@ Put the film in `training/input/` and photos of each actor in `training/data/act
 
 **Using LoRAs in the conversion.** List them under `style.loras` in the config (file, weight, optional trigger word and extra negatives; see the example in `config/project.example.yaml`). `cli.py run` / `preview` then chain a `LoraLoader` per entry into the img2img graph, add the trigger words to the prompt, and copy the files from `training/output/` into ComfyUI's `models/loras` if needed. The default is an empty list, which gives exactly the old graph. The list is part of the shot's recorded settings: change it and the shot stops, so use a new shot name. To try a variant without editing your config, set the environment variable `ANIME_CONFIG` to another yaml file. The AnimateDiff cloud workflow uses the same list: the bundle carries the LoRA files and the notebook copies them into ComfyUI (`docs/cloud-kaggle.md`).
 
+**What the testing settled** (`docs/phase4-results.md` has the pictures and numbers):
+- The **style LoRA at 0.6 with denoise 0.6 and ControlNet 0.8** gives the anime look on a close-up face. `config/project.yaml` holds exactly this.
+- The **actor LoRA is off.** Trained on real photos, it pulls the face back to photographic and fights the anime look. The lineart ControlNet already carries the likeness in a close-up, so it adds little there.
+- Add `black hair, red eyes` to the prompt to stop the hair and eye colour changing between frames; put `scar, blood, smoke` in the LoRA's negatives to keep the vampire-hunter details out.
+- **Do not put `red hair` in the negatives**: it also removes the red eyes.
+- For a close-up face set `temporal.lowpass_sigma: 8` before deflickering, or the shading smears.
+- The **AnimateDiff cloud pass softens this look** even with the LoRA applied, so the local path is the one to use for a face.
+
 ## 15. Not built yet
 
-From `plan.md`: phase 3 is done (local deflicker, and the AnimateDiff cloud stage on Kaggle). Optional phase 3 work still open: IP-Adapter at weights below 0.5, and trying more clips (the settings were tuned on one clip and held up on a second). RAFT optical flow was tried in the deflicker and not kept: no gain on either test clip, even in fast camera pans (`phase3-guide.md` section 5.5). Then phase 4 (LoRA training), phase 5 (matting, compositing, face pass) and phase 6 (per-shot config list, web UI, cloud worker). The numbers to compare against, on `dance_run1`, are in section 7 and `docs/phase3-guide.md`.
+From `plan.md`: phases 1 to 4 are done. Phase 4 is complete except for `cli.py train`, so training, captioning and evaluation are run through the scripts in `training/` (section 14b). Still to come: phase 5 (matting, compositing, face pass) and phase 6 (per-shot config list, web UI, cloud worker).
+
+Open items from the earlier phases:
+- **IP-Adapter** has only been tried at weight 0.5; lower weights are untested. It did not help, and it does not fix the cloud stage's softer look either (`docs/phase4-results.md`).
+- **More clips.** The phase 3 settings were tuned on one clip and held up on a second, but a close-up face needed a different deflicker setting (`temporal.lowpass_sigma` 8 instead of 2).
+- **RAFT optical flow** was tried in the deflicker and not kept: no gain on either test clip, even in fast camera pans (`phase3-guide.md` section 5.5).
+- **The actor LoRA** is off by default: trained on real photos, it pulls the face back to photographic. Training it on anime-styled versions of the photos is the open idea (`docs/phase4-results.md`).
+
+The numbers to compare against, on `dance_run1`, are in section 7 and `docs/phase3-guide.md`.
 
 ## 16. Change log
 
@@ -326,3 +342,5 @@ Add a line here whenever something is added or changed that affects how the proj
 | 2026-11-02 | Phase 4: `style.loras` in the config puts trained LoRAs into the local img2img graph; `ANIME_CONFIG` env var picks another config file. First test: shot `dance_lora1` (see `docs/phase4-results.md`). |
 | 2026-11-03 | `config/project.yaml` created with the selfie setting "A" (style LoRA 0.6, denoise 0.6, ControlNet 0.8, actor LoRA off, whole clip `my video new.MOV`, shot `full_A`); the LoRA test now sets its own `style.loras`. Deflicker of `full_A` and `full_C` measured in `docs/phase4-results.md`. |
 | 2026-11-03 | Cloud stage carries LoRAs: `style.loras` goes into the AnimateDiff graph, `make_cloud_bundle.py` packs the LoRA files under `loras/`, notebook step 3 copies them into ComfyUI. Bundle for `full_A` built (`work/cloud/bundle_full_A.zip`, 129 MB). Rebuild and re-upload the Kaggle dataset after this change: the old notebook and code do not know LoRAs. |
+| 2026-11-05 | Deflicker `temporal.lowpass_sigma` raised from 2 to 8 in `config/project.yaml`: at 2 the face's cel shading was dragged along the optical flow and smeared. The cloud AnimateDiff run of `full_A` applied the style LoRA correctly but still softens the anime look, so the local path stays the one for this clip (`docs/phase4-results.md`). |
+| 2026-11-05 | Documentation brought up to date across `README.md`, `plan.md`, `CLAUDE.md`, `docs/phase1-guide.md`, `phase2-results.md`, `phase3-guide.md`, `cloud-kaggle.md` and `phase4-results.md`: phase 4 is built, the settled LoRA and deflicker settings are recorded, and the stale "phase 4 not started" notes are gone. |

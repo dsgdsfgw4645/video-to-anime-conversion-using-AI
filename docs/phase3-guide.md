@@ -124,7 +124,9 @@ Tuned on the per-frame output of this clip. Sharpness is the Laplacian variance 
 | 0.8 | 3 | 25 | 4.34 | 0.897 | 1.00 |
 | 1.0 | 3 | 15 | 4.26 | 0.898 | 1.00 |
 
-Chosen: strength 0.9, sigma 2, threshold 25. The full blend (sigma 0) is as steady but loses 42% of the sharpness and smears moving limbs. A lower threshold (15) was slightly worse everywhere. Checked by eye on the highest-motion frame (frame 10); one faint tint of the previous frame remains on one dancer's trousers.
+Chosen on this clip: strength 0.9, sigma 2, threshold 25. The full blend (sigma 0) is as steady but loses 42% of the sharpness and smears moving limbs. A lower threshold (15) was slightly worse everywhere. Checked by eye on the highest-motion frame (frame 10); one faint tint of the previous frame remains on one dancer's trousers.
+
+**Sigma 2 is wrong for a close-up face** (found in phase 4 on a selfie clip, `docs/phase4-results.md`). At that radius the face's own cel shading counts as "low frequency", so it is dragged along the optical flow of a nearly flat face, where Farneback flow is unreliable; because each output frame feeds the next, the error accumulates and slides around the face. `config/project.yaml` therefore uses **sigma 8**, which blends only the overall tone. The metrics get worse when sigma is raised (static change 4.51 -> 6.23 on `full_A`) while the picture gets better, because the metrics reward averaging: judge this stage by eye.
 
 ### 5.5 Tried and not kept: RAFT flow instead of Farneback
 
@@ -195,4 +197,5 @@ To check that the settings tuned on clip 1 are not specific to it, the same flow
 - **The deflicker cannot fix a color that is already wrong,** only smooth changes between frames.
 - **The cloud stage needs about 16 GB of GPU memory** and a Kaggle account (internet access in notebooks needs phone verification); free-tier limits change.
 - **The static metric** depends on how much of the shot is still (87% here) and says nothing about quality; the color metric averages over the whole frame.
-- A style or actor LoRA (phase 4) is still the way to change the checkpoint's look.
+- **AnimateDiff dilutes a style LoRA.** On the phase 4 selfie clip the cloud pass kept the colours but lost the hard cel shadows and bold lineart that the local per-frame pass produced, even with the style LoRA applied at the same weight. Its motion module adds temporal attention trained on real video, which both weakens the LoRA and smooths the high-frequency detail the cel look is made of. For a close-up face the local path is the better one (`docs/phase4-results.md`).
+- **A style or actor LoRA** (phase 4) is the way to change the checkpoint's look; `style.loras` in the config now feeds both the local and the cloud graph.
