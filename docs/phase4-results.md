@@ -136,3 +136,35 @@ K1/K2 used `tan skin`, which made the skin too brown for the user's fair skin. `
 After the jaw and colour experiments were dropped, `full_D` raised `controlnet.lineart_strength` to 1.0 (everything else as `full_A`) so the face follows the source. It is slightly rounder and closer than `full_A`, but the style LoRA still slims it (`work/default/compare_faithful.png`). Its deflicker (strength 0.9, sigma 8, error 25) cut colour change per frame from 2.02 to 1.37. Stronger variants (strength 0.97 sigma 8: 1.34; 0.95 sigma 16: 1.51; 0.97 sigma 24: 1.63) were no better, so the remaining red/grey glasses flips and face-line changes come from the generator, not the deflicker (`work/default/compare_deflD.png`). `config/project.yaml` holds these settings.
 
 **Median deflicker (2026-11-07).** Built `temporal.mode: median` (`docs/phase3-guide.md`) and tried it on `full_D`: whole-frame SSIM ratio 0.893 (recursive) -> 0.939 (radius 3, sigma 2), face lines visibly steadier; sigma 0 reached 0.969 but softened the lines. Red glasses that persist over several frames survive it. `config/project.yaml` uses radius 3, sigma 2.
+
+## 12 fps against 24 fps (2026-11-07)
+
+Same 2 s slice (from 3.6 s), `full_D` render settings, median deflicker with `lowpass_sigma: 2`; 12 fps with radius 3
+(`fps12_T`, 24 frames) and 24 fps with radius 6 (`fps24_T`, 48 frames), so both look about 0.25 s each way.
+Rendering took twice as long at 24 fps (about 8 against 16 minutes) and the deflicker 1 min 45 s for 48 frames.
+
+| | SSIM ratio | colour change per frame | face brightness change per second |
+|---|---|---|---|
+| 12 fps raw | 0.879 | 2.00 | 23.3 |
+| 12 fps deflickered | 0.944 | 1.42 | 18.1 |
+| 24 fps raw | 0.899 | 1.60 | 29.5 |
+| 24 fps deflickered | 0.952 | 1.05 | 19.8 |
+
+Per frame the 24 fps result is steadier, but that is largely because the frames are closer in time; per second the
+face changes about as much. By eye (`work/default/compare_fps.png`) nothing visible improved: the glasses still turn
+red-rimmed in the later frames, and the face lines look the same. Conclusion: 24 or 30 fps is not worth twice the
+render time here, and it moves away from the on-twos anime look. Keep 12 fps.
+
+## `full_E`: the whole clip at 30 fps (2026-11-07)
+
+`full_D` settings at `video.work_fps: 30` (190 frames), median deflicker with radius 8 (0.27 s each way; radius 15 was not
+tried: 3 -> 5 at 12 fps gave no gain and the clip has fast hand and head motion). Render 65 min (about 20 s/frame), deflicker 8 min.
+
+| | whole-frame SSIM ratio | static-region change | colour change per frame |
+|---|---|---|---|
+| `full_E` raw | 0.895 | 7.39 | 1.51 |
+| `full_E` deflickered | 0.948 | 4.47 | 0.95 |
+
+For comparison `full_D` (12 fps) was 0.874 raw and 0.939 deflickered. Part of the gain is that closer frames are alike by
+construction (see the 12 vs 24 fps section); per second it is expected to be about the same. The median deflicker does not
+remove a glasses colour that stays red for several frames. Videos: `work/default/out/full_E.mp4`, `full_E_deflicker.mp4`.

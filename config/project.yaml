@@ -8,7 +8,8 @@ input:
   video: my video new.MOV   # relative to the project root; CLI argument overrides it
   start: 0             # seconds into the clip; --start overrides
   seconds: null        # length to process (omit or null = to the end); --seconds overrides
-  shot: full_D         # name of this run's folders and output video; --shot overrides.
+  shot: full_E         # name of this run's folders and output video; --shot overrides.
+                       # full_D = 12 fps, ControlNet 1.0; full_E = the same at 30 fps with deflicker radius 8.
                        # full_A = ControlNet 0.8; full_D = ControlNet 1.0 (face follows the source exactly).
                        # Same name + same settings = frames are reused. Same name + different settings =
                        # the run stops and nothing is overwritten, so pick a new name for each experiment.
@@ -54,16 +55,24 @@ animatediff:           # phase 3 cloud stage (cli.py animatediff): the whole sho
     reference: samples/dance/ip_reference.png   # relative to the project root; frame 28 of the dance_run1 anime output
 
 temporal:              # phase 3 flow-warp deflicker (cli.py deflicker); CPU only
-  mode: median         # median: per-pixel median of the 3 frames on each side, warped onto the frame (steadier lines and shapes;
+  mode: median         # median: per-pixel median of the 6 frames on each side, warped onto the frame (steadier lines and shapes;
                        # tested on full_D). recursive = the older blend with the previous output (strength 0.9, lowpass_sigma 8).
-  radius: 3            # median mode: neighbours used on each side
+  # radius = frames used on each side, so the time span is radius / video.work_fps seconds each way. Suggested (0.25 s = safe on fast
+  # motion, 0.5 s = steadier on slow motion; the work grows with the radius, 2 optical flows per frame per unit):
+  #   video.work_fps 12 -> radius 3 (0.25 s) or 6 (0.5 s)
+  #   video.work_fps 15 -> radius 4 or 8
+  #   video.work_fps 24 -> radius 6 or 12
+  #   video.work_fps 30 -> radius 8 or 15
+  radius: 8            # median mode: neighbours used on each side (0.27 s at 30 fps)
   strength: 1.0        # median: how far toward the median (1 = all); recursive: weight of the warped previous frame
   lowpass_sigma: 2     # median: only colors/tones coarser than this many pixels move to the median, so the lines stay crisp
                        # (0 = whole frame; steadiest but softens the lines). recursive mode needs 8 on a face: at 2 it smears.
   error_threshold: 25  # source color error (0-255) above which the warp is ignored (occlusions, fast motion)
 
 video:
-  work_fps: 12         # stylize "on twos"; the output is encoded at this rate
+  work_fps: 30         # THE FPS OF THE OUTPUT: frames are extracted, stylized and encoded at this rate (12 = "on twos", the anime look;
+                       # 24 or 30 = smoother but 2 to 2.5x the render time, and it did not reduce the flicker per second, see
+                       # docs/phase4-results.md). Changing it is a changed setting: use a new input.shot. Then set temporal.radius to match.
   target_megapixels: 0.4   # about 864x488 for a 16:9 clip; safe on a 6 GB GPU
 
 training:              # phase 4 (LoRA training); see training/README.md

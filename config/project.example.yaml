@@ -52,6 +52,8 @@ animatediff:           # phase 3 cloud stage (cli.py animatediff): the whole sho
 temporal:              # phase 3 flow-warp deflicker (cli.py deflicker); CPU only
   mode: recursive      # recursive = blend with the previous output; median = per-pixel median of the radius frames on each side,
                        # warped onto the frame (no error build-up; steadier lines and shapes). Changing it needs a new shot name.
+  # radius = frames on each side, so the time span is radius / video.work_fps seconds each way. Suggested: 12 fps -> 3 (0.25 s) or 6;
+  # 15 -> 4 or 8; 24 -> 6 or 12; 30 -> 8 or 15 (the work grows with the radius).
   radius: 3            # median mode: neighbours used on each side
   strength: 0.9        # recursive: weight of the warped previous frame where the flow is trusted (0 = off); median: how far toward the median (1 = all)
   lowpass_sigma: 2     # blend only colors/tones coarser than this many pixels, keeping the fresh frame's edges (0 = blend all)
@@ -60,7 +62,8 @@ temporal:              # phase 3 flow-warp deflicker (cli.py deflicker); CPU onl
   error_threshold: 25  # source color error (0-255) above which the warp is ignored (occlusions, fast motion)
 
 video:
-  work_fps: 12         # stylize "on twos"; the output is encoded at this rate
+  work_fps: 12         # THE FPS OF THE OUTPUT: frames are extracted, stylized and encoded at this rate (12 = "on twos", the anime look;
+                       # 24 or 30 = smoother but 2 to 2.5x the render time). A changed setting: use a new input.shot, and set temporal.radius to match.
   target_megapixels: 0.4   # about 864x488 for a 16:9 clip; safe on a 6 GB GPU
 
 training:              # phase 4 (LoRA training); see training/README.md
