@@ -21,7 +21,9 @@ style:
   positive: "masterpiece, best quality, anime style, cel shading, clean lineart, vibrant colors"
   negative: "lowres, bad anatomy, bad hands, blurry, worst quality, jpeg artifacts, watermark, realistic, photo"
   loras: []            # phase 4: LoRAs from training/output/, applied in this order. Empty = plain checkpoint. Example:
-  #   - {name: bloodlust_style.safetensors, weight: 0.5, trigger: bloodlust_style}
+  #   - {file: training/output/bloodlust_style/bloodlust_style.safetensors, weight: 0.5, trigger: bloodlust_style}
+  #   `file:` is the path to the .safetensors (relative to the project root, or absolute); `name:` is optional (defaults to its file name).
+  #   Without `file:`, the LoRA is looked up by `name:` in ComfyUI's models/loras, then training/output/<run>/.
   #   - {name: adwait_person-000004.safetensors, weight: 0.7, trigger: adwait_person, negative: "beanie, headband, hat"}
   #   Files are copied into ComfyUI's models/loras automatically. Changing this list counts as a changed setting (use a new shot name).
 
@@ -48,7 +50,10 @@ animatediff:           # phase 3 cloud stage (cli.py animatediff): the whole sho
     reference: samples/dance/ip_reference.png   # relative to the project root; frame 28 of the dance_run1 anime output
 
 temporal:              # phase 3 flow-warp deflicker (cli.py deflicker); CPU only
-  strength: 0.9        # weight of the motion-warped previous frame where the flow is trusted (0 = off)
+  mode: recursive      # recursive = blend with the previous output; median = per-pixel median of the radius frames on each side,
+                       # warped onto the frame (no error build-up; steadier lines and shapes). Changing it needs a new shot name.
+  radius: 3            # median mode: neighbours used on each side
+  strength: 0.9        # recursive: weight of the warped previous frame where the flow is trusted (0 = off); median: how far toward the median (1 = all)
   lowpass_sigma: 2     # blend only colors/tones coarser than this many pixels, keeping the fresh frame's edges (0 = blend all)
                        # 2 was tuned on the dance clip; on a close-up face it drags the cel shading around, so use 8 there
                        # (config/project.yaml does; docs/phase4-results.md has the comparison)

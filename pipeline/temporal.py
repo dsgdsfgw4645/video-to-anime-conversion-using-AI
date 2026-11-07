@@ -6,6 +6,15 @@ per-frame redraw is averaged away; where it moves, the warp follows the motion; 
 trusted (occlusions, fast motion), the fresh stylized frame is used as is. It runs on the CPU (OpenCV),
 so it needs no GPU memory on top of stylizing.
 
+Two modes (`temporal.mode`):
+  recursive (default)  each frame is blended with the previous output (above). Errors carry forward, and it
+                       only moves overall tone.
+  median               each frame is compared with the `radius` frames on each side, all warped onto it along
+                       the source's optical flow; the per-pixel median of those votes (frames the flow can't
+                       explain count as the frame itself) replaces the frame's low frequencies. Nothing is
+                       carried forward, so errors don't build up, and a one-frame flip (glasses red, then
+                       grey) is outvoted by its neighbours.
+
 Layout: work/<project>/deflicker/<shot>/frame_%05d.png, resumable like the other stages.
 """
 import json
@@ -60,6 +69,44 @@ def blend_frame(anime: np.ndarray, prev_out: np.ndarray, src: np.ndarray, prev_s
     return np.clip(anime_f * (1 - a) + warped * a, 0, 255).astype(np.uint8)
 
 
+def _align(src: np.ndarray, other_src: np.ndarray, error_threshold: float):
+    """Flow from `src` back to `other_src`: returns (warp, trust). warp(img) moves an image shaped like
+    `other_src` onto `src`; trust (h, w, 1) is 1 where the warped other source reproduces `src`, 0 where not."""
+    g, og = (cv2.cvtColor(x, cv2.COLOR_BGR2GRAY) for x in (src, other_src))
+    flow = cv2.calcOpticalFlowFarneback(g, og, None, 0.5, 4, 25, 3, 7, 1.5, 0)
+    h, w = g.shape
+    xs, ys = np.meshgrid(np.arange(w, dtype=np.float32), np.arange(h, dtype=np.float32))
+    mx, my = xs + flow[..., 0], ys + flow[..., 1]
+    warp = lambda img: cv2.remap(img, mx, my, cv2.INTER_LINEAR, borderMode=cv2.BORDER_REPLICATE)
+    err = cv2.GaussianBlur(np.abs(warp(other_src).astype(np.float32) - src.astype(np.float32)).mean(axis=2), (0, 0), 3)
+    return warp, np.clip(1.0 - err / error_threshold, 0.0, 1.0)[..., None]
+
+
+def median_frame(anime: np.ndarray, src: np.ndarray, neighbours: list[tuple[np.ndarray, np.ndarray]],
+                 error_threshold: float, sigma: float = 2, strength: float = 1.0) -> np.ndarray:
+    """The per-pixel median of `anime` and its neighbours warped onto it. All arrays are BGR uint8, same size.
+
+    neighbours: [(stylized frame, its source frame), ...] on both sides of this one.
+    A neighbour's vote at a pixel is its warped color weighted by the flow's trust there; with no trust it
+    is this frame's own color, so a bad warp can't pull the result away.
+    sigma: if > 0, only the colors below that blur radius (pixels) move to the median; the frame keeps its own
+    fine edges. 0 replaces the whole frame (sharpest consensus, but a misaligned line can double).
+    strength: how far toward the median result to go (1 = all the way).
+    """
+    if not neighbours:
+        return anime
+    base = anime.astype(np.float32)
+    votes = [base]
+    for n_anime, n_src in neighbours:
+        warp, trust = _align(src, n_src, error_threshold)
+        votes.append(base + trust * (warp(n_anime).astype(np.float32) - base))
+    med = np.median(np.stack(votes), axis=0)
+    if sigma > 0:
+        low = lambda x: cv2.GaussianBlur(x, (0, 0), sigma)
+        med = base + low(med) - low(base)
+    return np.clip(base + strength * (med - base), 0, 255).astype(np.uint8)
+
+
 def output_stage(source: str) -> str:
     """Folder name of the deflickered copy of a stage: `deflicker` for anime, `deflicker_<source>` otherwise."""
     return "deflicker" if source == "anime" else f"deflicker_{source}"
@@ -76,13 +123,31 @@ def deflicker_shot(cfg: dict, project_dir: Path, shot: str, source: str = "anime
     t = cfg["temporal"]
     prepare(out_dir, deflicker_settings(cfg, anime_dir))
     frames = sorted(anime_dir.glob("frame_*.png"))
+    mode = t.get("mode", "recursive")
+    if mode not in ("recursive", "median"):
+        raise ValueError(f"temporal.mode must be recursive or median, not {mode!r}")
+    radius = int(t.get("radius", 3))
+    cache: dict[int, tuple[np.ndarray, np.ndarray]] = {}   # median mode: index -> (stylized, source), a sliding window
+
+    def load(k: int, size: tuple[int, int]):
+        if k not in cache:
+            cache[k] = (_read(frames[k]), cv2.resize(_read(src_dir / frames[k].name), size, interpolation=cv2.INTER_AREA))
+        return cache[k]
+
     made = 0
     for i, f in enumerate(tqdm(frames, desc="deflicker", unit="frame")):
         dest = out_dir / f.name
         if dest.exists():
             continue
         anime = _read(f)
-        if i == 0:
+        if mode == "median":
+            size = (anime.shape[1], anime.shape[0])
+            for k in [k for k in cache if k < i - radius]:
+                del cache[k]
+            _, src = load(i, size)
+            near = [load(k, size) for k in range(max(0, i - radius), min(len(frames), i + radius + 1)) if k != i]
+            out = median_frame(anime, src, near, t["error_threshold"], t.get("lowpass_sigma", 2), t.get("strength", 1.0))
+        elif i == 0:
             out = anime
         else:
             size = (anime.shape[1], anime.shape[0])

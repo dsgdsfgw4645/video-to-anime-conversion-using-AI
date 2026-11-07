@@ -61,7 +61,7 @@ Results and the flicker baseline are in [docs/phase2-results.md](docs/phase2-res
 ## Steadier video (phase 3)
 
 ```powershell
-.venv\Scripts\python.exe cli.py deflicker                  # local, CPU, seconds: blend frames along the source's motion
+.venv\Scripts\python.exe cli.py deflicker                  # local, CPU, 1 to 2 min: median of the neighbouring frames warped along the source's motion (temporal.mode)
 .venv\Scripts\python.exe cli.py flicker --stage deflicker  # measure it
 .venv\Scripts\python.exe scripts\make_cloud_bundle.py       # pack the zip for the Kaggle AnimateDiff notebook
 ```
@@ -79,7 +79,7 @@ Trained locally on the same 6 GB card with [kohya sd-scripts](https://github.com
 .venv\Scripts\python.exe training\eval_grid.py --target style  # comparison grid of every saved epoch and weight
 ```
 
-List the finished LoRAs under `style.loras` in the config (file, weight, trigger word, optional extra negatives) and both the local img2img graph and the AnimateDiff cloud graph use them. Where to put the film and the photos: [training/README.md](training/README.md). Results, the chosen weights and what did not work: [docs/phase4-results.md](docs/phase4-results.md).
+List the finished LoRAs under `style.loras` in the config (`file:` path to the .safetensors, relative to the project or absolute; weight, trigger word, optional extra negatives) and both the local img2img graph and the AnimateDiff cloud graph use them. Where to put the film and the photos: [training/README.md](training/README.md). Results, the chosen weights and what did not work: [docs/phase4-results.md](docs/phase4-results.md).
 
 ## Layout
 
@@ -93,7 +93,7 @@ List the finished LoRAs under `style.loras` in the config (file, weight, trigger
 | `pipeline/shot_state.py` | records each shot's settings; stops a run that would overwrite a shot |
 | `pipeline/server.py` | starts ComfyUI when it isn't running, stops it afterwards |
 | `pipeline/metrics.py` | flicker metrics (whole frame, static regions, color) |
-| `pipeline/temporal.py` | phase 3 deflicker (optical-flow blend, CPU) |
+| `pipeline/temporal.py` | phase 3 deflicker (optical flow, CPU): `median` of neighbouring frames, or `recursive` blend with the previous one |
 | `pipeline/animatediff.py` | phase 3 cloud stage: one AnimateDiff pass over a whole shot (needs about 16 GB GPU) |
 | `pipeline/vram.py` | peak GPU memory of a run |
 | `pipeline/style_frames.py` | phase 4: pulls style training frames out of a film |

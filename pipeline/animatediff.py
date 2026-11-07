@@ -19,7 +19,7 @@ from PIL import Image
 from pipeline.comfy_client import ComfyClient
 from pipeline.server import comfy_server
 from pipeline.shot_state import SETTINGS, prepare
-from pipeline.stylize import ROOT, apply_loras, install_loras, lineart_resolution
+from pipeline.stylize import ROOT, apply_loras, install_loras, lineart_resolution, style_record
 from pipeline.vram import VramMonitor
 
 WORKFLOW = ROOT / "workflows" / "animatediff_lineart_api.json"
@@ -76,7 +76,7 @@ def animatediff_settings(cfg: dict, frames_dir: Path, seed: int | None, denoise:
         "sampling": {**cfg["sampling"],
                      "seed": seed if seed is not None else cfg["sampling"]["seed"],
                      "denoise": denoise if denoise is not None else cfg["sampling"]["denoise"]},
-        "style": cfg["style"], "models": cfg["models"], "controlnet": cfg["controlnet"],
+        "style": style_record(cfg["style"]), "models": cfg["models"], "controlnet": cfg["controlnet"],
         "target_megapixels": cfg["video"]["target_megapixels"],
         "animatediff": {**ad, "ip_adapter": {**ad["ip_adapter"],
                                              "reference_bytes": reference.stat().st_size if reference.exists() else None}},

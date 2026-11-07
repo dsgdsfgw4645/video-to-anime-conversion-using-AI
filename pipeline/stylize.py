@@ -28,7 +28,11 @@ def load_config() -> dict:
     cfg = Path(os.environ["ANIME_CONFIG"]) if os.environ.get("ANIME_CONFIG") else ROOT / "config" / "project.yaml"
     if not cfg.exists():
         cfg = ROOT / "config" / "project.example.yaml"
-    return yaml.safe_load(cfg.read_text(encoding="utf-8"))
+    data = yaml.safe_load(cfg.read_text(encoding="utf-8"))
+    for lora in (data.get("style") or {}).get("loras") or []:   # `file` alone is enough: the name is its file name
+        if lora.get("file") and not lora.get("name"):
+            lora["name"] = Path(lora["file"]).name
+    return data
 
 
 def lineart_resolution(megapixels: float, size: tuple[int, int], step: int = 8) -> int:
@@ -45,10 +49,37 @@ def lineart_resolution(megapixels: float, size: tuple[int, int], step: int = 8) 
 LORA_DIR = ROOT / "third_party" / "ComfyUI" / "models" / "loras"
 
 
+def lora_file(lora: dict) -> Path | None:
+    """The file a style.loras entry points at with `file:` (relative to the project root, or absolute), else None."""
+    return (ROOT / lora["file"]) if lora.get("file") else None
+
+
+def style_record(style: dict) -> dict:
+    """The style section as recorded in a shot's settings.json: no empty `loras`, and no `file` paths
+    (moving a LoRA file on disk is not a changed setting; its `name` and `weight` are)."""
+    out = {k: v for k, v in style.items() if k != "loras" or v}   # no loras = same record as before LoRAs existed
+    if out.get("loras"):
+        out["loras"] = [{k: v for k, v in l.items() if k != "file"} for l in out["loras"]]
+    return out
+
+
 def install_loras(cfg: dict) -> None:
-    """Make sure every LoRA named in style.loras is in ComfyUI's models/loras, copying it from training/output/ if not."""
+    """Make sure every LoRA in style.loras is in ComfyUI's models/loras.
+
+    An entry with `file:` is copied from there (again if its size changed). Without `file:` an existing
+    models/loras/<name> is used, else it is looked for in training/output/<run>/. In the cloud the notebook has
+    already put the files in models/loras and the bundled config has no `file:`.
+    """
     for lora in cfg["style"].get("loras") or []:
         dst = LORA_DIR / lora["name"]
+        src = lora_file(lora)
+        if src is not None:
+            if not src.is_file():
+                raise FileNotFoundError(f"LoRA file not found: {src} (style.loras `file:` in the config).")
+            if not dst.exists() or dst.stat().st_size != src.stat().st_size:
+                LORA_DIR.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(src, dst)
+            continue
         if dst.exists():
             continue
         found = sorted((ROOT / "training" / "output").glob(f"*/{lora['name']}"))

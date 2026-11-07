@@ -7,7 +7,7 @@ import pytest
 
 from pipeline.metrics import static_region_flicker
 from pipeline.shot_state import SettingsChanged
-from pipeline.temporal import blend_frame, deflicker_shot
+from pipeline.temporal import blend_frame, deflicker_shot, median_frame
 
 CFG = {"temporal": {"strength": 0.6, "error_threshold": 25}}
 
@@ -51,6 +51,38 @@ def test_changed_settings_stop_and_touch_nothing(tmp_path):
     with pytest.raises(SettingsChanged, match="temporal.strength"):
         deflicker_shot({"temporal": {"strength": 0.9, "error_threshold": 25}}, tmp_path, "s")
     assert (tmp_path / "deflicker" / "s" / "frame_00003.png").read_bytes() == before
+
+
+MEDIAN = {"temporal": {"mode": "median", "radius": 2, "strength": 1.0, "lowpass_sigma": 0, "error_threshold": 25}}
+
+
+def test_median_mode_outvotes_a_one_frame_flip(tmp_path):
+    """A frame whose color flips for one frame (the glasses going red) is pulled back to its neighbours'."""
+    base, noisy = _shot(tmp_path, 7)
+    flat = [np.full_like(base, 100) for _ in range(7)]
+    flat[3] = np.full_like(base, 200)                      # one-frame flip in a flat, still scene
+    _write(tmp_path / "anime" / "s", flat)
+    assert deflicker_shot(MEDIAN, tmp_path, "s") == 7
+    out = cv2.imread(str(tmp_path / "deflicker" / "s" / "frame_00004.png")).astype(int)
+    assert abs(out.mean() - 100) < 5                        # the flip is gone (a plain average would give about 130)
+
+
+def test_median_mode_resumes_and_is_tracked_as_a_setting(tmp_path):
+    _shot(tmp_path, 6)
+    deflicker_shot(MEDIAN, tmp_path, "s")
+    (tmp_path / "deflicker" / "s" / "frame_00003.png").unlink()
+    assert deflicker_shot(MEDIAN, tmp_path, "s") == 1       # frames don't depend on earlier output, so one is enough
+    other = {"temporal": {**MEDIAN["temporal"], "radius": 3}}
+    with pytest.raises(SettingsChanged, match="temporal.radius"):
+        deflicker_shot(other, tmp_path, "s")
+
+
+def test_median_mode_with_no_neighbours_and_unknown_mode(tmp_path):
+    a = np.full((32, 32, 3), 50, np.uint8)
+    assert median_frame(a, a, [], 25) is a
+    _shot(tmp_path, 3)
+    with pytest.raises(ValueError, match="temporal.mode"):
+        deflicker_shot({"temporal": {"mode": "bogus", "strength": 1, "error_threshold": 25}}, tmp_path, "s")
 
 
 def test_untrusted_warp_keeps_the_fresh_frame():

@@ -1,4 +1,5 @@
 """Phase 4 tests: photo preparation and captioning (fake tagger, no model download)."""
+import pytest
 import numpy as np
 from PIL import Image
 
@@ -82,3 +83,29 @@ def test_apply_loras_chains_and_rewires():
     assert wf["10"]["inputs"]["model"] == ["21", 0] and wf["4"]["inputs"]["clip"] == ["21", 1] == wf["5"]["inputs"]["clip"]
     assert wf["4"]["inputs"]["text"].startswith("ta, tb, ") and wf["5"]["inputs"]["text"].endswith(", hat")
     assert wf["8"]["inputs"]["positive"] == ["4", 0]                               # ControlNet still reads the encoded prompts
+
+
+def test_lora_file_path_is_copied_named_after_the_file_and_not_a_recorded_setting(tmp_path, monkeypatch):
+    import pipeline.stylize as st
+    lora = tmp_path / "elsewhere" / "my_style.safetensors"
+    lora.parent.mkdir()
+    lora.write_bytes(b"x" * 10)
+    monkeypatch.setattr(st, "LORA_DIR", tmp_path / "models_loras")
+    monkeypatch.setattr(st, "ROOT", tmp_path)
+    cfg = {"style": {"loras": [{"file": "elsewhere/my_style.safetensors", "name": "my_style.safetensors", "weight": 0.5}]}}
+    st.install_loras(cfg)
+    assert (tmp_path / "models_loras" / "my_style.safetensors").read_bytes() == b"x" * 10
+    lora.write_bytes(b"y" * 20)                         # a replaced file is copied again
+    st.install_loras(cfg)
+    assert (tmp_path / "models_loras" / "my_style.safetensors").stat().st_size == 20
+    assert st.style_record(cfg["style"])["loras"] == [{"name": "my_style.safetensors", "weight": 0.5}]
+    with pytest.raises(FileNotFoundError, match="LoRA file not found"):
+        st.install_loras({"style": {"loras": [{"file": "nope.safetensors", "name": "nope.safetensors", "weight": 1}]}})
+
+
+def test_load_config_names_a_lora_after_its_file(tmp_path, monkeypatch):
+    from pipeline.stylize import load_config
+    p = tmp_path / "c.yaml"
+    p.write_text("style:" + chr(10) + "  loras:" + chr(10) + "    - {file: D:/models/cool.safetensors, weight: 0.4}" + chr(10), encoding="utf-8")
+    monkeypatch.setenv("ANIME_CONFIG", str(p))
+    assert load_config()["style"]["loras"][0]["name"] == "cool.safetensors"

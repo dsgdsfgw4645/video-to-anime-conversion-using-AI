@@ -13,7 +13,7 @@ from tqdm import tqdm
 from pipeline.comfy_client import ComfyClient
 from pipeline.server import comfy_server
 from pipeline.shot_state import SETTINGS, prepare
-from pipeline.stylize import ANIME_NODE, LINEART_NODE, build_workflow, install_loras
+from pipeline.stylize import ANIME_NODE, LINEART_NODE, build_workflow, install_loras, style_record
 from pipeline.vram import VramMonitor
 
 
@@ -24,7 +24,7 @@ def stylize_settings(cfg: dict, frames_dir: Path, seed: int | None, denoise: flo
         "sampling": {**cfg["sampling"],
                      "seed": seed if seed is not None else cfg["sampling"]["seed"],
                      "denoise": denoise if denoise is not None else cfg["sampling"]["denoise"]},
-        "style": {k: v for k, v in cfg["style"].items() if k != "loras" or v},   # no loras = same record as before LoRAs existed
+        "style": style_record(cfg["style"]),
         "models": cfg["models"], "controlnet": cfg["controlnet"],
         "target_megapixels": cfg["video"]["target_megapixels"],
         "frames": json.loads(src.read_text(encoding="utf-8")) if src.exists() else None,

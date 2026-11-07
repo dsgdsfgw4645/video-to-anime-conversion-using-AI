@@ -20,6 +20,8 @@ frames/<shot>   ->  B. Kaggle: AnimateDiff pass  ->  animatediff/<shot>  ->  def
 3. A trust map says where the warp can be believed: where the warped previous *source* matches the current source (color error below `temporal.error_threshold`). Occlusions, fast motion and cuts get no blending.
 4. Only the coarse colors and tones (blur radius `temporal.lowpass_sigma` pixels) of the fresh frame are moved toward the warped one, by `temporal.strength` times the trust. The fresh frame keeps its own edges and fine detail, so moving limbs stay sharp.
 
+**Median mode (2026-11-07, `temporal.mode: median`).** Instead of blending with the previous output, each frame is compared with the `radius` frames on each side. Every neighbour is warped onto the frame along the source's optical flow (Farneback, source frame to source frame), weighted by the same trust map, and the per-pixel median of those votes replaces the frame's colours below `lowpass_sigma` pixels. Nothing is carried forward, so errors can't build up, and a colour that flips for a frame is outvoted. Results on `full_D` (76 frames, SSIM ratio, higher is steadier; about 80 s on the CPU): recursive 0.893; radius 3 sigma 2 0.939; radius 3 sigma 0 0.969 (but softens the lines on the glasses, hair and eyes); radius 5 sigma 2 0.936 (slower, no better); radius 3 sigma 5 0.906. Colour change per frame was about the same (1.4). A glasses colour that stays red for several frames is not outvoted (`work/default/compare_median.png`). `radius 3, sigma 2` is the setting.
+
 The first frame is copied unchanged. Blending every frequency (`lowpass_sigma: 0`) steadies a bit more but softens the picture to 58% of the original sharpness and leaves smeared trails behind moving limbs above strength 0.7, so it is not used.
 
 **B. The cloud stage** (`pipeline/animatediff.py`, `cli.py animatediff`, run by `notebooks/kaggle_animatediff.ipynb`). `workflows/animatediff_lineart_api.json`:
@@ -46,7 +48,7 @@ One pass makes the whole shot, so the stage is all or nothing: if it fails, noth
 | `cli.py` | commands `deflicker`, `animatediff`, `encode`; `flicker --stage` |
 | `config/project.example.yaml` | new sections `animatediff:` and `temporal:` |
 | `samples/dance/ip_reference.png`, `samples/dance/ip_reference_ad.png` | the two IP-Adapter reference images tried |
-| `tests/test_phase3.py` | 22 tests (the whole suite is 47); ComfyUI is faked |
+| `tests/test_phase3.py` | 30 tests (the whole suite is 67); ComfyUI is faked |
 | `cloud-kaggle.md` | the step-by-step guide for the Kaggle route |
 
 ## 3. Running it
@@ -186,12 +188,13 @@ To check that the settings tuned on clip 1 are not specific to it, the same flow
 
 ## 6. Verified
 
-- `pytest tests -q`: 47 pass (22 in `tests/test_phase3.py`: deflicker effect, resume, settings protection, trust map, low-pass edge test, the AnimateDiff graph with and without IP-Adapter and with the sliding-window-safe ControlNet nodes, the shot runner with a fake ComfyUI, missing-node message, color metric on synthetic shots, bundle overrides, IP-Adapter off by default).
+- `pytest tests -q`: 67 pass (30 in `tests/test_phase3.py`: deflicker effect (recursive and median modes), resume, settings protection, trust map, low-pass edge test, the AnimateDiff graph with and without IP-Adapter and with the sliding-window-safe ControlNet nodes, the shot runner with a fake ComfyUI, missing-node message, color metric on synthetic shots, bundle overrides, IP-Adapter off by default).
 - The AnimateDiff graph was **run for real** on the local RTX 2060 (20 frames at 0.12 MP, 6 steps, 45 to 57 s, peak GPU memory 5221 MiB), with and without IP-Adapter, through `animatediff_shot()`; this found the ControlNet bug below. Then it ran on Kaggle at full size (48 frames, 0.4 MP) for the four runs in sections 5.1 and 5.6.
 - **Bugs found by running it:** the stock ControlNet nodes fail with AnimateDiff's sliding windows ("Control type ControlNet may not support required features for sliding context window"), fixed with ComfyUI-Advanced-ControlNet; a Windows-only subprocess flag in `vram.py` and a PowerShell-only server start crashed on Linux; Kaggle unzips uploaded datasets, so the notebook looks for the extracted project as well as a zip; a ComfyUI that was running before a custom node was installed never sees that node, so `animatediff_shot` now checks the nodes first and the notebook starts a fresh server.
 
 ## 7. Known issues and pending
 
+- **Persistent colour errors survive the deflicker.** Even the median mode (section 1) only outvotes a colour that flips for a frame or two; red glasses that stay red for several frames in a row are kept, because that comes from the generator. A fix has to be at render time (prompt or conditioning). Not yet solved.
 - **Two clips.** The settings were tuned on `dance_run1` (a mostly locked-off camera) and held up on `capetown_run1` (a handheld camera, section 5.6). Other footage, especially with close-ups, may still need other settings.
 - **AnimateDiff output has blockier limbs and a distorted crowd** that the metrics do not capture. The model is SD1.5 at 0.4 MP.
 - **IP-Adapter** was only tried at weight 0.5 with two references. Lower weights, and footage where the checkpoint recolors more strongly, are untested.

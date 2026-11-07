@@ -39,8 +39,8 @@ changed the run stops, and you set `training.<target>.run` to a new name to trai
 ## Checking and using a LoRA
 `training/eval_grid.py --target style|<ActorName>` renders the same four prompts with the same seed for the plain
 checkpoint, every saved epoch at weight 0.8 and the final file at two other weights, into
-`training/output/eval/<name>/grid.jpg` (32 images, about 5 minutes). Pick a column, then list the file under
-`style.loras` in the config to use it in the conversion.
+`training/output/eval/<name>/grid.jpg` (32 images, about 5 minutes). Pick a column, then put its path as `file:` under
+`style.loras` in the config (relative to the project, or absolute) to use it in the conversion.
 
 **What the first round settled** (`docs/phase4-results.md`): the style LoRA works and is on by default at weight
 0.6. The actor LoRA is **off**: trained on real photos, it pulls the face back to photographic and fights the anime

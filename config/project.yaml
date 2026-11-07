@@ -21,8 +21,12 @@ models:
 style:
   positive: "masterpiece, best quality, anime style, cel shading, clean lineart, vibrant colors, black hair, red eyes"
   negative: "lowres, bad anatomy, bad hands, blurry, worst quality, jpeg artifacts, watermark, realistic, photo"
-  loras:               # phase 4: LoRAs from training/output/, applied in this order. Empty list = plain checkpoint.
-    - {name: bloodlust_style.safetensors, weight: 0.6, trigger: bloodlust_style, negative: "scar, blood, smoke, purple hair, maroon hair, brown hair, colored hair"}
+  loras:               # phase 4: LoRAs, applied in this order. Empty list = plain checkpoint.
+                       # file: where the .safetensors is (relative to the project root, or an absolute path such as D:/models/x.safetensors);
+                       #       it is copied into ComfyUI's models/loras when needed. To use another LoRA, change `file:`.
+                       # name: optional, defaults to the file's name. Without `file:` the LoRA is looked up by name in
+                       #       ComfyUI's models/loras, then training/output/<run>/.
+    - {file: training/output/bloodlust_style/bloodlust_style.safetensors, weight: 0.6, trigger: bloodlust_style, negative: "scar, blood, smoke, purple hair, maroon hair, brown hair, colored hair"}
   # The actor LoRA is off: it pulled the face back to photographic (docs/phase4-results.md). To try it again, add
   #   - {name: adwait_person-000004.safetensors, weight: 0.25, trigger: adwait_person, negative: "beanie, headband, hat"}
   #   Files are copied into ComfyUI's models/loras automatically. Changing this list counts as a changed setting (use a new shot name).
@@ -50,10 +54,12 @@ animatediff:           # phase 3 cloud stage (cli.py animatediff): the whole sho
     reference: samples/dance/ip_reference.png   # relative to the project root; frame 28 of the dance_run1 anime output
 
 temporal:              # phase 3 flow-warp deflicker (cli.py deflicker); CPU only
-  strength: 0.9        # weight of the motion-warped previous frame where the flow is trusted (0 = off)
-  lowpass_sigma: 8     # blend only colors/tones coarser than this many pixels, keeping the fresh frame's edges (0 = blend all).
-                       # 2 (the example's value) also drags the face's cel shading along the optical flow, and because each
-                       # output feeds the next the error builds up and slides around the face. 8 blends only overall tone.
+  mode: median         # median: per-pixel median of the 3 frames on each side, warped onto the frame (steadier lines and shapes;
+                       # tested on full_D). recursive = the older blend with the previous output (strength 0.9, lowpass_sigma 8).
+  radius: 3            # median mode: neighbours used on each side
+  strength: 1.0        # median: how far toward the median (1 = all); recursive: weight of the warped previous frame
+  lowpass_sigma: 2     # median: only colors/tones coarser than this many pixels move to the median, so the lines stay crisp
+                       # (0 = whole frame; steadiest but softens the lines). recursive mode needs 8 on a face: at 2 it smears.
   error_threshold: 25  # source color error (0-255) above which the warp is ignored (occlusions, fast motion)
 
 video:

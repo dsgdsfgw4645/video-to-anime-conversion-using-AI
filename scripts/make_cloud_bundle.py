@@ -19,7 +19,7 @@ from pathlib import Path
 import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from pipeline.stylize import LORA_DIR, ROOT, load_config  # noqa: E402
+from pipeline.stylize import LORA_DIR, ROOT, load_config, lora_file  # noqa: E402
 from pipeline.video import extract_frames  # noqa: E402
 
 CODE = ["cli.py", "pipeline", "workflows", "scripts/download_models.py"]
@@ -55,8 +55,12 @@ def ensure_frames(cfg: dict, frames: Path) -> None:
     print(f"extracted {n} frames from {video.name}")
 
 
-def find_lora(name: str) -> Path:
-    """A LoRA file by name: ComfyUI's models/loras first, else training/output/<run>/."""
+def find_lora(name: str, file: Path | None = None) -> Path:
+    """A LoRA's file: the config's `file:` if given, else ComfyUI's models/loras, else training/output/<run>/."""
+    if file is not None:
+        if not file.is_file():
+            raise SystemExit(f"LoRA file not found: {file} (style.loras `file:` in the config).")
+        return file
     for found in [LORA_DIR / name, *sorted((ROOT / "training" / "output").glob(f"*/{name}"))]:
         if found.is_file():
             return found
@@ -78,8 +82,11 @@ def bundle(cfg: dict, shot: str, project: str) -> tuple[list[tuple[Path, str]], 
     frames = ROOT / "work" / project / "frames" / shot
     ensure_frames(cfg, frames)
     pairs = [(f, f.relative_to(ROOT).as_posix()) for f in files + sorted(frames.glob("*"))]
-    pairs += [(find_lora(l["name"]), f"loras/{l['name']}") for l in cfg["style"].get("loras") or []]
-    return pairs, yaml.safe_dump(cfg, sort_keys=False)
+    loras = cfg["style"].get("loras") or []
+    pairs += [(find_lora(l["name"], lora_file(l)), f"loras/{l['name']}") for l in loras]
+    # the bundled config must not carry this machine's paths: in the cloud the notebook has copied the files into place
+    bundled = {**cfg, "style": {**cfg["style"], "loras": [{k: v for k, v in l.items() if k != "file"} for l in loras]}}
+    return pairs, yaml.safe_dump(bundled, sort_keys=False)
 
 
 def main() -> None:
