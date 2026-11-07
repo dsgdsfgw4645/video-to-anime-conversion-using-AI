@@ -2,7 +2,7 @@
 
 **Where it landed.** The style LoRA works and is on by default; the actor LoRA is off, because trained on real
 photos it pulls the face back to photographic. The settled recipe for the selfie clip is in `config/project.yaml`:
-style LoRA at 0.6, denoise 0.6, ControlNet 0.8, prompt plus `black hair, red eyes`, deflicker `lowpass_sigma: 8`,
+style LoRA at 0.6, denoise 0.6, ControlNet 1.0 (shot `full_D`; `full_A` used 0.8), prompt plus `black hair, red eyes`, deflicker `lowpass_sigma: 8`,
 and the local per-frame path rather than the AnimateDiff cloud pass. Sections below, oldest first.
 
 Trained locally on the RTX 2060 with kohya sd-scripts (`training/train.py`), base checkpoint Counterfeit-V3.0, rank 32 / alpha 16, 512 px, batch 1, AdamW8bit, 1.24 steps/s, peak about 3.6 GB.
@@ -94,3 +94,43 @@ colour drift, and phase 3 already found it did not help (`docs/phase3-guide.md` 
   the anime style. The current one is trained on the photos as they are, which is why it fights the anime look.
 - More actor photos without the headband, in other clothes and places, to cut the background and outfit leaks.
 - Phase 5 (matting, compositing, face pass): likely a bigger win on this footage than more LoRA tuning.
+
+## Fixing the flipping jawline (2026-11-05)
+
+The jaw kept switching between anime-sharp (frames 47, 50, 52, 56, 64 of `full_A`) and round like the real face
+(48, 68, 72, 76). Cause: the lineart ControlNet at 0.8 traces the real jaw out of each source frame, so where that
+edge is strong it forces the round shape and where it is weak the style LoRA's anime jaw wins. Each frame is drawn
+on its own, so the balance tips back and forth.
+
+Four 2-second runs over that stretch (24 frames each, `work/default/compare_jaw_strip.png` shows every 2nd frame
+cropped to the face, which is the only way to judge this; a jaw-width metric was tried and discarded as unreliable,
+reading only 9 to 13 of 24 frames):
+
+| Run | ControlNet | LoRA | Jaw words | Result | SSIM ratio |
+|---|---|---|---|---|---|
+| `jaw_J0` | 0.8 | 0.6 | no | the reference: jaw flips frame to frame | 0.884 |
+| `jaw_J1` | 0.8 | 0.6 | yes | a little narrower, still flips | 0.893 |
+| **`jaw_J2`** | **0.6** | **0.6** | **yes** | **sharp and consistent, still recognisable** | **0.897** |
+| `jaw_J3` | 0.5 | 0.8 | yes | sharpest, but gaunt and hollow-cheeked, with red streak artifacts | 0.907 |
+
+Chosen: `jaw_J2`. The ControlNet strength is the lever, not the prompt: the words alone (J1) barely helped.
+Steadiness did not suffer (ratio 0.884 -> 0.897, colour frame-to-frame 2.13 -> 2.38), because the jaw is now driven
+by the LoRA, which is stable, instead of by the source lineart, which changes with angle and lighting.
+J2 was applied to `config/project.yaml` for a while (ControlNet 0.6, jaw words, shot `full_B`) and later dropped; see the outcome below.
+
+## Fixing the colour changes on the face and glasses (2026-11-07)
+
+In `full_A` the skin swung between white and pale (face brightness fell from 123 to 101 over the clip) and the glasses
+flipped between red, black, brown and clear. Causes: the prompt said nothing about skin tone or the glasses (your real
+ones are dark grey, your skin medium tan), and `red eyes` bled into the frames. Tests `col_K1` (ControlNet 0.6) and
+`col_K2` (0.7), 2 s each, both with `dark grey glasses, tan skin, warm skin tone` in the prompt and
+`red glasses, red frame, colored glasses, pale skin, white skin` in the negatives: skin stays tan and the glasses stay
+dark grey in every sampled frame. The Lab numbers barely moved (they measure frame-to-frame change, not a constant
+bias), so this was judged by eye on `work/default/compare_color.png`. `config/project.yaml` now uses K2.
+K1/K2 used `tan skin`, which made the skin too brown for the user's fair skin. `col_K3` (`fair skin, white skin tone`) overshot to ghostly white with red lips (`red eyes` bleeds into the lips). `col_K4` (`fair skin, natural skin tone`; negatives `tan skin, brown skin, dark skin, orange skin, pale skin, pasty, red lips`) was still too white for the user, who wanted full_A's tone. Measured on the same 2 s, full_A's face is Lab 106.5/134/137. `col_K5` (no skin words at all; negatives `red glasses, red frame, colored glasses, pale skin, pasty, red lips`) gave 104/133/138, the closest, with steady dark grey glasses; `col_K6` (`light tan skin`) was too brown (101/135/140). K5 is the setting in `config/project.yaml` (`work/default/compare_skin3.png`). Skin-colour words in the positive prompt all overshoot; leave them out.
+
+**Outcome (2026-11-07):** the K5 and K6 images were judged much worse in quality than `full_A`, so none of the jaw (J2) or colour (K1 to K6) settings were kept. `config/project.yaml` is back to `full_A`'s settings (ControlNet 0.8, no jaw, glasses or skin words), with only the deflicker settings (`lowpass_sigma: 8`) different from what `full_A` was deflickered with. The jaw flipping and the colour drift in `full_A` are therefore open again.
+
+## `full_D`: face that follows the source (2026-11-07)
+
+After the jaw and colour experiments were dropped, `full_D` raised `controlnet.lineart_strength` to 1.0 (everything else as `full_A`) so the face follows the source. It is slightly rounder and closer than `full_A`, but the style LoRA still slims it (`work/default/compare_faithful.png`). Its deflicker (strength 0.9, sigma 8, error 25) cut colour change per frame from 2.02 to 1.37. Stronger variants (strength 0.97 sigma 8: 1.34; 0.95 sigma 16: 1.51; 0.97 sigma 24: 1.63) were no better, so the remaining red/grey glasses flips and face-line changes come from the generator, not the deflicker (`work/default/compare_deflD.png`). `config/project.yaml` holds these settings.

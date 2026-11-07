@@ -8,7 +8,8 @@ input:
   video: my video new.MOV   # relative to the project root; CLI argument overrides it
   start: 0             # seconds into the clip; --start overrides
   seconds: null        # length to process (omit or null = to the end); --seconds overrides
-  shot: full_A         # name of this run's folders and output video; --shot overrides.
+  shot: full_D         # name of this run's folders and output video; --shot overrides.
+                       # full_A = ControlNet 0.8; full_D = ControlNet 1.0 (face follows the source exactly).
                        # Same name + same settings = frames are reused. Same name + different settings =
                        # the run stops and nothing is overwritten, so pick a new name for each experiment.
                        # Omit it to use the video's file name (plus _preview for `preview`).
@@ -35,7 +36,7 @@ sampling:
   denoise: 0.6         # setting "A" for the selfie clip with the style LoRA (the example file's default is 0.4)
 
 controlnet:
-  lineart_strength: 0.8
+  lineart_strength: 1.0   # full_D: the face follows the source lineart as closely as possible (full_A used 0.8; 0.6 gave a sharp anime jaw)
 
 animatediff:           # phase 3 cloud stage (cli.py animatediff): the whole shot in one AnimateDiff pass; needs ~16 GB GPU
   motion_model: v3_sd15_mm.ckpt

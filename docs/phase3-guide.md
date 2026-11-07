@@ -128,6 +128,8 @@ Chosen on this clip: strength 0.9, sigma 2, threshold 25. The full blend (sigma 
 
 **Sigma 2 is wrong for a close-up face** (found in phase 4 on a selfie clip, `docs/phase4-results.md`). At that radius the face's own cel shading counts as "low frequency", so it is dragged along the optical flow of a nearly flat face, where Farneback flow is unreliable; because each output frame feeds the next, the error accumulates and slides around the face. `config/project.yaml` therefore uses **sigma 8**, which blends only the overall tone. The metrics get worse when sigma is raised (static change 4.51 -> 6.23 on `full_A`) while the picture gets better, because the metrics reward averaging: judge this stage by eye.
 
+On `full_D` (2026-11-07) stronger settings gave no steadier result: strength 0.97 with sigma 8, 16 and 24 scored colour change per frame 1.34, 1.51 and 1.63, against 1.37 for strength 0.9 with sigma 8. Larger sigmas are worse. What flicker is left (glasses flipping red/grey, face lines changing shape) is in the generator's output, which a blend toward the previous frame cannot fix (`docs/phase4-results.md`).
+
 ### 5.5 Tried and not kept: RAFT flow instead of Farneback
 
 The deflicker measures motion with OpenCV's Farneback method. A learned flow model, torchvision's RAFT, was tried in its place (temporarily, on the same 48 frames and settings; the code was removed again because it gave no gain). Farneback is the first row of each pair:

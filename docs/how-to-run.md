@@ -28,7 +28,7 @@ That is the whole project: it reads the video and settings from `config/project.
 | `result_*/` | about 40 MB each | The folders you get when you unzip the Kaggle results. Copy their contents into `work/default/` (section 7). |
 | `__pycache__/`, `.pytest_cache/` | small | Python and test caches, created automatically. |
 
-`config/project.yaml` (your own settings) is in the project and is not ignored. The code reads it first and falls back to `config/project.example.yaml`. It holds the selfie setting "A" (see section 9); the example keeps the original defaults.
+`config/project.yaml` (your own settings) is in the project and is not ignored. The code reads it first and falls back to `config/project.example.yaml`. It holds the selfie setting "D" (see section 9); the example keeps the original defaults.
 
 **Setting up on a new computer (or after deleting `.venv` or `third_party`):**
 
@@ -191,7 +191,7 @@ Phase 4 (LoRA training) is built and has its own run configurations (section 14b
 
 ## 9. Settings you change
 
-All in `config/project.yaml`, which is read instead of `config/project.example.yaml` (the example stays as the template with the original defaults; the table's Default column is the example's). `project.yaml` currently has setting "A" for `my video new.MOV`: whole clip, shot `full_A`, style LoRA `bloodlust_style` at 0.6 (actor LoRA off), prompt adds `black hair, red eyes`, denoise 0.6, ControlNet 0.8. Running `cli.py` (or the VS Code run button) with it reuses the finished `full_A` frames; for another experiment give it a new `input.shot`. Note that the file is a complete copy: new keys added to the example later must be copied in by hand.
+All in `config/project.yaml`, which is read instead of `config/project.example.yaml` (the example stays as the template with the original defaults; the table's Default column is the example's). `project.yaml` currently has setting "D" for `my video new.MOV`: whole clip, shot `full_D`, style LoRA `bloodlust_style` at 0.6 (actor LoRA off), prompt adds `black hair, red eyes`, denoise 0.6, ControlNet 1.0 (the face follows the source lineart; "A" was the same with 0.8), deflicker strength 0.9 / sigma 8 / error 25. Running `cli.py` (or the VS Code run button) with it reuses the finished `full_D` frames; for another experiment give it a new `input.shot`. Note that the file is a complete copy: new keys added to the example later must be copied in by hand.
 
 | Key | Meaning | Default |
 |---|---|---|
@@ -292,11 +292,12 @@ Put the film in `training/input/` and photos of each actor in `training/data/act
 **Using LoRAs in the conversion.** List them under `style.loras` in the config (file, weight, optional trigger word and extra negatives; see the example in `config/project.example.yaml`). `cli.py run` / `preview` then chain a `LoraLoader` per entry into the img2img graph, add the trigger words to the prompt, and copy the files from `training/output/` into ComfyUI's `models/loras` if needed. The default is an empty list, which gives exactly the old graph. The list is part of the shot's recorded settings: change it and the shot stops, so use a new shot name. To try a variant without editing your config, set the environment variable `ANIME_CONFIG` to another yaml file. The AnimateDiff cloud workflow uses the same list: the bundle carries the LoRA files and the notebook copies them into ComfyUI (`docs/cloud-kaggle.md`).
 
 **What the testing settled** (`docs/phase4-results.md` has the pictures and numbers):
-- The **style LoRA at 0.6 with denoise 0.6 and ControlNet 0.8** gives the anime look on a close-up face. `config/project.yaml` holds exactly this.
+- The **style LoRA at 0.6 with denoise 0.6 and ControlNet 1.0** (0.8 in the earlier `full_A`) gives the anime look on a close-up face. `config/project.yaml` holds exactly this.
 - The **actor LoRA is off.** Trained on real photos, it pulls the face back to photographic and fights the anime look. The lineart ControlNet already carries the likeness in a close-up, so it adds little there.
 - Add `black hair, red eyes` to the prompt to stop the hair and eye colour changing between frames; put `scar, blood, smoke` in the LoRA's negatives to keep the vampire-hunter details out.
 - **Do not put `red hair` in the negatives**: it also removes the red eyes.
-- For a close-up face set `temporal.lowpass_sigma: 8` before deflickering, or the shading smears.
+- For a close-up face set `temporal.lowpass_sigma: 8` before deflickering, or the shading smears. Stronger settings (strength 0.97, sigma 16 or 24) are no steadier: what remains (glasses flipping red/grey, face lines changing) comes from the generator, not the deflicker.
+- **A jawline that flips between anime-sharp and round is the ControlNet, not the prompt.** At `lineart_strength: 0.8` it traces the real jaw, which wins on some frames and loses on others. 0.6 hands the shape to the style LoRA and keeps it steady; 0.5 is sharper but gaunt. Jaw words in the prompt alone barely help. The sharp-jaw (0.6) and colour-fix (glasses/skin words) variants cost image quality, so they are not in the config; `full_D` went the other way, ControlNet 1.0, to keep the face like the source.
 - The **AnimateDiff cloud pass softens this look** even with the LoRA applied, so the local path is the one to use for a face.
 
 ## 15. Not built yet
@@ -344,3 +345,7 @@ Add a line here whenever something is added or changed that affects how the proj
 | 2026-11-03 | Cloud stage carries LoRAs: `style.loras` goes into the AnimateDiff graph, `make_cloud_bundle.py` packs the LoRA files under `loras/`, notebook step 3 copies them into ComfyUI. Bundle for `full_A` built (`work/cloud/bundle_full_A.zip`, 129 MB). Rebuild and re-upload the Kaggle dataset after this change: the old notebook and code do not know LoRAs. |
 | 2026-11-05 | Deflicker `temporal.lowpass_sigma` raised from 2 to 8 in `config/project.yaml`: at 2 the face's cel shading was dragged along the optical flow and smeared. The cloud AnimateDiff run of `full_A` applied the style LoRA correctly but still softens the anime look, so the local path stays the one for this clip (`docs/phase4-results.md`). |
 | 2026-11-05 | Documentation brought up to date across `README.md`, `plan.md`, `CLAUDE.md`, `docs/phase1-guide.md`, `phase2-results.md`, `phase3-guide.md`, `cloud-kaggle.md` and `phase4-results.md`: phase 4 is built, the settled LoRA and deflicker settings are recorded, and the stale "phase 4 not started" notes are gone. |
+| 2026-11-05 | `config/project.yaml` switched to the sharp-jaw settings ("J2"): `controlnet.lineart_strength` 0.8 -> 0.6, `sharp jawline, angular face, defined chin, narrow face` added to the prompt and `round face, chubby, soft jaw, double chin, fat` to the negatives, shot name `full_A` -> `full_B`. At 0.8 the jawline flipped between anime-sharp and round between frames (`docs/phase4-results.md`). |
+| 2026-11-07 | `config/project.yaml` colour fix ("K2"): `dark grey glasses` added to the prompt (no skin-colour words: any of them overshoots), `red glasses, red frame, colored glasses, pale skin, pasty, red lips` to the negatives, `controlnet.lineart_strength` 0.6 -> 0.7. Skin had swung white/pale and the glasses red/black/brown (`docs/phase4-results.md`). |
+| 2026-11-07 | `config/project.yaml` set back to setting "A" (everything the `full_A` run used: no jaw/glasses/skin words, ControlNet 0.8, style LoRA 0.6, denoise 0.6, shot `full_A`), keeping the deflicker settings (`lowpass_sigma: 8`). The jaw (J2) and colour (K1 to K6) experiments cost image quality; they stay documented in `docs/phase4-results.md` but are not in the config. |
+| 2026-11-07 | `config/project.yaml` = the `full_D` run: `controlnet.lineart_strength` 0.8 -> 1.0 (the face follows the source lineart; the prompt is unchanged from `full_A`) and shot `full_D`; deflicker unchanged (strength 0.9, `lowpass_sigma: 8`, error threshold 25). Stronger deflicker variants (strength 0.97, sigma 16/24) were no steadier (`docs/phase4-results.md`). |
