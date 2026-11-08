@@ -335,3 +335,13 @@ def test_bundle_stops_when_a_lora_file_is_missing(tmp_path, monkeypatch):
     monkeypatch.setattr(m, "LORA_DIR", tmp_path)
     with pytest.raises(SystemExit):
         m.find_lora("not_trained_yet.safetensors")
+
+
+def test_smooth_maps_removes_a_one_frame_line_flicker():
+    import numpy as np
+    from pipeline.lineart import smooth_maps
+    src = np.full((48, 64, 3), 100, np.uint8)
+    raws = [np.zeros((48, 64, 3), np.uint8) for _ in range(5)]
+    raws[2][:, 30:33] = 255                      # a jaw line that exists in one frame only
+    out = smooth_maps(raws, [src] * 5, radius=2)
+    assert out[2].max() == 0 and len(out) == 5

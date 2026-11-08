@@ -25,12 +25,12 @@ class ComfyClient:
         r.raise_for_status()
         return sorted({n["class_type"] for n in workflow.values()} - r.json().keys())
 
-    def upload_image(self, path: Path) -> str:
-        """Upload to ComfyUI's input folder and return the name to use in a LoadImage node."""
+    def upload_image(self, path: Path, name: str | None = None) -> str:
+        """Upload to ComfyUI's input folder (as `name`, default the file's own) and return the name to use in a LoadImage node."""
         with open(path, "rb") as f:
             r = requests.post(
                 f"{self.url}/upload/image",
-                files={"image": (path.name, f)},
+                files={"image": (name or path.name, f)},
                 data={"overwrite": "true"},
             )
         r.raise_for_status()

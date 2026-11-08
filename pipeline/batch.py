@@ -11,6 +11,7 @@ from PIL import Image
 from tqdm import tqdm
 
 from pipeline.comfy_client import ComfyClient
+from pipeline.lineart import make_smooth_lineart
 from pipeline.server import comfy_server
 from pipeline.shot_state import SETTINGS, prepare
 from pipeline.stylize import ANIME_NODE, LINEART_NODE, build_workflow, install_loras, style_record
@@ -45,11 +46,23 @@ def stylize_shot(cfg: dict, project_dir: Path, shot: str,
         return 0
     install_loras(cfg)
     client = ComfyClient(cfg["comfyui"]["url"])
+    smooth = int(cfg["controlnet"].get("smooth_radius", 0)) > 0
     with comfy_server(client, cfg), VramMonitor() as vram:  # starts ComfyUI if needed; stops it again if it did
+        if smooth:
+            def raw_workflow(frame: Path):
+                with Image.open(frame) as im:
+                    size = im.size
+                wf = build_workflow(cfg, client.upload_image(frame), size, seed=seed, denoise=denoise)
+                del wf[ANIME_NODE]   # only the lineart output is wanted: ComfyUI then runs just the preprocessor
+                return wf, LINEART_NODE
+            smooth_dir = make_smooth_lineart(cfg, client, project_dir, shot, raw_workflow)
         for frame in tqdm(todo, desc="stylize", unit="frame"):
             with Image.open(frame) as im:
                 size = im.size
             wf = build_workflow(cfg, client.upload_image(frame), size, seed=seed, denoise=denoise)
+            if smooth:   # the ControlNet (and the saved lineart) read the smoothed map instead of the raw one
+                wf["14"] = {"class_type": "LoadImage", "inputs": {"image": client.upload_image(smooth_dir / frame.name, "smooth_" + frame.name)}}
+                wf["8"]["inputs"]["image"] = wf["13"]["inputs"]["images"] = ["14", 0]
             entry = client.wait(client.queue(wf))
             client.download_outputs(
                 entry, project_dir,

@@ -210,6 +210,7 @@ All in `config/project.yaml`, which is read instead of `config/project.example.y
 | `sampling.denoise` | How far the result moves from the source: lower stays closer. | `0.4` |
 | `sampling.steps`, `cfg`, `sampler`, `scheduler` | Sampler settings. | 24, 7.0, euler_ancestral, normal |
 | `controlnet.lineart_strength` | How strictly lineart guides the result. | `0.8` |
+| `controlnet.smooth_radius` | `0` = off. Above 0, the lineart maps are smoothed over time first (median of this many maps on each side, warped by the source's optical flow) so the face lines the ControlNet follows stay steady. 3 at 12 fps gave a small gain; it adds a quick pre-pass. | `0` |
 | `video.work_fps` | Frame rate used for stylizing and for the output. | `12` |
 | `video.target_megapixels` | Working size per frame. About 0.4 fits a 6 GB GPU. | `0.4` |
 
@@ -222,6 +223,7 @@ Everything is under `work/<project>/` (default `work/default/`). `work/` is gene
 | `frames/<shot>/` | Source frames, `frame_00001.png` ... , and `settings.json` |
 | `anime/<shot>/` | Stylized frames and `settings.json` |
 | `lineart/<shot>/` | The lineart control maps (for checking the guidance) |
+| `lineart_raw/<shot>/`, `lineart_smooth/<shot>/` | Only with `controlnet.smooth_radius` > 0: the extractor's maps, and the time-smoothed maps the ControlNet reads |
 | `deflicker/<shot>/` | Phase 3: the local deflicker applied to `anime/<shot>` |
 | `animatediff/<shot>/` | Phase 3: the cloud AnimateDiff result (copied in from the Kaggle download) |
 | `deflicker_animatediff/<shot>/` | Phase 3: the deflicker applied to the AnimateDiff result |
@@ -354,3 +356,4 @@ Add a line here whenever something is added or changed that affects how the proj
 | 2026-11-07 | `config/project.yaml`: `temporal.radius` 3 -> 6 (the deflicker settings of the `fps24_T` test, at 12 fps: median mode, strength 1.0, `lowpass_sigma: 2`, error threshold 25). Radius 6 uses 6 frames each way, twice the time span of 3. The existing `deflicker/full_D` frames were made with radius 3, so `cli.py deflicker` stops with `SettingsChanged` until that folder is moved. |
 | 2026-11-07 | Config comments only: `video.work_fps` is marked as the output fps (it already set the extract, stylize and encode rate; changing it needs a new shot name), and `temporal.radius` lists suggested values per fps (12: 3 or 6, 15: 4 or 8, 24: 6 or 12, 30: 8 or 15; radius / fps = seconds each way). |
 | 2026-11-07 | `config/project.yaml` = the `full_E` run: `video.work_fps` 12 -> 30, `temporal.radius` 6 -> 8 (0.27 s each way at 30 fps; the per-fps radius suggestions are in the comments above `radius`), shot `full_E`. Whole clip: 190 frames, about 65 min render + 8 min deflicker. Results in `docs/phase4-results.md`. |
+| 2026-11-08 | New `controlnet.smooth_radius` (default 0 = off, in both config files): smooths the lineart maps over time before the ControlNet (`pipeline/lineart.py`, new folders `lineart_raw/` and `lineart_smooth/`). It is part of the shot's recorded `controlnet` settings, so changing it needs a new shot name. `ComfyClient.upload_image` takes an optional upload name. Results in `docs/phase4-results.md`. 68 tests. |

@@ -48,7 +48,7 @@ One pass makes the whole shot, so the stage is all or nothing: if it fails, noth
 | `cli.py` | commands `deflicker`, `animatediff`, `encode`; `flicker --stage` |
 | `config/project.example.yaml` | new sections `animatediff:` and `temporal:` |
 | `samples/dance/ip_reference.png`, `samples/dance/ip_reference_ad.png` | the two IP-Adapter reference images tried |
-| `tests/test_phase3.py` | 30 tests (the whole suite is 67); ComfyUI is faked |
+| `tests/test_phase3.py` | 31 tests (the whole suite is 68); ComfyUI is faked |
 | `cloud-kaggle.md` | the step-by-step guide for the Kaggle route |
 
 ## 3. Running it
@@ -188,7 +188,7 @@ To check that the settings tuned on clip 1 are not specific to it, the same flow
 
 ## 6. Verified
 
-- `pytest tests -q`: 67 pass (30 in `tests/test_phase3.py`: deflicker effect (recursive and median modes), resume, settings protection, trust map, low-pass edge test, the AnimateDiff graph with and without IP-Adapter and with the sliding-window-safe ControlNet nodes, the shot runner with a fake ComfyUI, missing-node message, color metric on synthetic shots, bundle overrides, IP-Adapter off by default).
+- `pytest tests -q`: 68 pass (31 in `tests/test_phase3.py`: deflicker effect (recursive and median modes), resume, settings protection, trust map, low-pass edge test, the AnimateDiff graph with and without IP-Adapter and with the sliding-window-safe ControlNet nodes, the shot runner with a fake ComfyUI, missing-node message, color metric on synthetic shots, bundle overrides, IP-Adapter off by default).
 - The AnimateDiff graph was **run for real** on the local RTX 2060 (20 frames at 0.12 MP, 6 steps, 45 to 57 s, peak GPU memory 5221 MiB), with and without IP-Adapter, through `animatediff_shot()`; this found the ControlNet bug below. Then it ran on Kaggle at full size (48 frames, 0.4 MP) for the four runs in sections 5.1 and 5.6.
 - **Bugs found by running it:** the stock ControlNet nodes fail with AnimateDiff's sliding windows ("Control type ControlNet may not support required features for sliding context window"), fixed with ComfyUI-Advanced-ControlNet; a Windows-only subprocess flag in `vram.py` and a PowerShell-only server start crashed on Linux; Kaggle unzips uploaded datasets, so the notebook looks for the extracted project as well as a zip; a ComfyUI that was running before a custom node was installed never sees that node, so `animatediff_shot` now checks the nodes first and the notebook starts a fresh server.
 

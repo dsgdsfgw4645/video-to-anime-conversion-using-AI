@@ -41,6 +41,8 @@ sampling:
   denoise: 0.6         # setting "A" for the selfie clip with the style LoRA (the example file's default is 0.4)
 
 controlnet:
+  smooth_radius: 0     # >0: smooth the lineart maps over time first (median of this many maps on each side, warped by the source's
+                       # optical flow) so the jaw and face lines the ControlNet follows stay steady. 0 = off. Try 3 at 12 fps.
   lineart_strength: 1.0   # full_D: the face follows the source lineart as closely as possible (full_A used 0.8; 0.6 gave a sharp anime jaw)
 
 animatediff:           # phase 3 cloud stage (cli.py animatediff): the whole shot in one AnimateDiff pass; needs ~16 GB GPU

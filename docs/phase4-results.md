@@ -168,3 +168,30 @@ tried: 3 -> 5 at 12 fps gave no gain and the clip has fast hand and head motion)
 For comparison `full_D` (12 fps) was 0.874 raw and 0.939 deflickered. Part of the gain is that closer frames are alike by
 construction (see the 12 vs 24 fps section); per second it is expected to be about the same. The median deflicker does not
 remove a glasses colour that stays red for several frames. Videos: `work/default/out/full_E.mp4`, `full_E_deflicker.mp4`.
+
+## Steadier lineart for the ControlNet (2026-11-08)
+
+New `controlnet.smooth_radius` (`pipeline/lineart.py`): the lineart maps of a shot are made first, each is replaced by the
+per-pixel median of itself and its neighbours warped by the source's optical flow, and the ControlNet reads the smoothed maps.
+Test on the 2 s slice of `fps12_T` (12 fps, `full_D` render settings, median deflicker radius 3):
+
+| | whole-frame ratio | static-region change | colour change per frame |
+|---|---|---|---|
+| baseline `fps12_T` | 0.944 | 5.62 | 1.42 |
+| smooth 3 (`lsm3_T`) | 0.951 | 5.44 | 1.41 |
+| smooth 6 (`lsm6_T`) | 0.950 | 5.44 | 1.41 |
+
+The gain is small and 6 is no better than 3. The raw maps (`work/default/compare_lsm.png`) are already close from frame to frame,
+so the jaw changing between frames comes mostly from the generator redrawing it at denoise 0.6. Left off (`smooth_radius: 0`).
+Next candidates: denoise about 0.5, previous-frame (flow-warped) init, or a LoRA trained on curated anime frames of the actor.
+
+## Red lips and glasses: prompt test (2026-11-08)
+
+2 s slice at 6 fps, `full_D` render settings (`work/default/compare_prompt_lips.png`). B1 added `black-rimmed glasses, black glasses
+frame, natural pink lips` to the positive prompt: lips still red in 3 of 4 frames, glasses red-rimmed in 2. B2 added those words
+plus `red lips, lipstick, red glasses, red frame, colored glasses` to the negative prompt: glasses black or dark grey and no red
+lips in all four, but the faces came out older, with heavier forehead and cheek lines, and the user judged the full-clip B2
+renders (`gen_s1`, `gen_s2`, seeds 12345 and 777) to be bad quality, so that run was cancelled. Neither prompt is in the config.
+Untried: `(red eyes:0.8)` to cut the bleed at its source, a lighter negative (`red lips, red glasses` only), and recolouring
+lips and glasses after rendering with a landmark mask.
+
