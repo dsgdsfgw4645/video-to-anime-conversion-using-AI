@@ -5,11 +5,13 @@ comfyui:
   autostop: true       # stop it again afterwards, but only if we started it; false = leave it running
 
 input:
-  video: my video new.MOV   # relative to the project root; CLI argument overrides it
+  video: my video new2.MOV   # relative to the project root; CLI argument overrides it
   start: 0             # seconds into the clip; --start overrides
   seconds: null        # length to process (omit or null = to the end); --seconds overrides
-  shot: full_E         # name of this run's folders and output video; --shot overrides.
-                       # full_D = 12 fps, ControlNet 1.0; full_E = the same at 30 fps with deflicker radius 8.
+  shot: new2_30fps     # name of this run's folders and output video; --shot overrides.
+                       # full_D = 12 fps, ControlNet 1.0; full_E = the same at 30 fps with deflicker radius 8 (my video new.MOV);
+                       # new1_30fps = my video new1.MOV (15.8 s) at 30 fps with deflicker radius 15 (stopped at 177 frames);
+                       # new2_30fps = my video new2.MOV at 30 fps with deflicker radius 8.
                        # full_A = ControlNet 0.8; full_D = ControlNet 1.0 (face follows the source exactly).
                        # Same name + same settings = frames are reused. Same name + different settings =
                        # the run stops and nothing is overwritten, so pick a new name for each experiment.

@@ -195,3 +195,20 @@ renders (`gen_s1`, `gen_s2`, seeds 12345 and 777) to be bad quality, so that run
 Untried: `(red eyes:0.8)` to cut the bleed at its source, a lighter negative (`red lips, red glasses` only), and recolouring
 lips and glasses after rendering with a landmark mask.
 
+## `new2_30fps` and `new1_30fps`: two more clips (2026-11-08)
+
+`my video new1.MOV` (15.8 s, 475 frames at 30 fps, deflicker radius 15) was rendered to 177 frames and stopped (the system's
+low-memory guard killed the first run at 171 frames; the resumed one was stopped by hand); its partial video is
+`work/default/out/new1_30fps_partial.mp4` (raw, 5.9 s). `my video new2.MOV` (13.3 s, 400 frames, radius 8, same settings as `full_E`)
+ran to the end: raw 0.880 whole-frame SSIM ratio, static-region change 8.92, colour change per frame 2.94; deflickered 0.931, 5.47, 1.82
+(colour drift 8.2 -> 7.6 over the shot, large because the lighting changes as the user moves). Videos: `work/default/out/new2_30fps.mp4`
+and `new2_30fps_deflicker.mp4`.
+
+Problems seen (the raw frames have them too, so the deflicker is not the cause; `work/default/compare_new2.png`, `compare_new2_bad.png`):
+red-rimmed glasses in every sampled frame (the `red eyes` bleed again), and in frames 248 and 296 the face and a raised fist are rendered
+pale white and flat, "like stone". In frame 248 the fist is small, sharp and far from the camera and the lineart traces it clearly, so
+this is a colour problem, not missing guidance (a sampled patch of the hand got lighter than the source, BGR 102,132,152 -> 123,152,171). Likely causes:
+`black hair, red eyes` pulls toward a pale character, and at denoise 0.6 the model redoes the colour instead of keeping the source's skin
+tone. In frame 296 the close, blurred hand has almost no lineart, so the model invents its surface, and `vibrant colors` oversaturates it
+orange. Not yet tested: denoise 0.5 or 0.4 on frames 248 and 296.
+
